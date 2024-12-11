@@ -1,0 +1,22 @@
+[package]
+name = "hokulea-host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alloy-primitives.workspace = true
+alloy-provider.workspace = true
+anyhow.workspace = true
+bincode.workspace = true
+clap.workspace = true
+
+kona-client.workspace = true
+kona-host.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
+
