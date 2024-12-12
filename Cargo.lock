@@ -1558,6 +1558,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "eigenda"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "async-trait",
+ "kona-derive",
+ "op-alloy-protocol",
+ "tracing",
+]
+
+[[package]]
+name = "eigenda-proof"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "async-trait",
+ "eigenda",
+ "kona-derive",
+ "kona-driver",
+ "kona-preimage",
+ "kona-proof",
+ "op-alloy-genesis",
+]
+
+[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1945,6 +1970,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "hokulea-client"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus 0.3.6",
+ "alloy-primitives",
+ "alloy-provider 0.3.6",
+ "anyhow",
+ "bincode",
+ "clap",
+ "eigenda",
+ "eigenda-proof",
+ "kona-client",
+ "kona-driver",
+ "kona-host",
+ "kona-preimage",
+ "kona-proof",
+ "thiserror 2.0.6",
+ "tracing",
+]
+
+[[package]]
 name = "hokulea-host"
 version = "0.1.0"
 dependencies = [
@@ -1955,6 +2001,7 @@ dependencies = [
  "clap",
  "kona-client",
  "kona-host",
+ "kona-preimage",
  "serde",
  "serde_json",
  "tempfile",
@@ -4909,8 +4956,3 @@ dependencies = [
  "quote",
  "syn 2.0.90",
 ]
-
-[[patch.unused]]
-name = "op-alloy-protocol"
-version = "0.2.8"
-source = "git+https://github.com/alloy-rs/op-alloy?rev=0d8ef62#0d8ef62ae942c85d260e64f08d10e0a429c00289"

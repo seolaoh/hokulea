@@ -1,11 +1,12 @@
 [package]
-name = "hokulea-host"
+name = "hokulea-client"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 alloy-primitives.workspace = true
 alloy-provider.workspace = true
+alloy-consensus.workspace = true
 anyhow.workspace = true
 bincode.workspace = true
 clap.workspace = true
@@ -13,11 +14,12 @@ clap.workspace = true
 kona-client.workspace = true
 kona-host.workspace = true
 kona-preimage.workspace = true
+kona-proof.workspace = true
+kona-driver.workspace = true
 
-serde.workspace = true
-serde_json.workspace = true
-tempfile.workspace = true
-tokio.workspace = true
-tracing-subscriber.workspace = true
+eigenda.workspace = true
+eigenda-proof.workspace = true
+
+thiserror.workspace = true
 tracing.workspace = true
 
