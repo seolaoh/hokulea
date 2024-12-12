@@ -17,12 +17,12 @@ use kona_proof::{
 };
 use core::fmt::Debug;
 use alloc::sync::Arc;
-use thiserror::Error;
+use kona_executor::{ExecutorError, TrieDBProvider};
 use tracing::{error, info, warn};
 
 use eigenda_proof::pipeline::{OracleDataProvider, OracleDerivationPipeline};
 
-//use eigenda::OracleEigenDAProvider;
+use eigenda_proof::eigenda_provider::OracleEigenDAProvider;
 
 #[inline]
 pub async fn run<P, H>(oracle_client: P, hint_client: H) -> Result<(), FaultProofProgramError>

@@ -19,6 +19,9 @@ use eigenda::traits::EigenDABlobProvider;
 use eigenda::eigenda::EigenDADataSource;
 use eigenda::eigenda_blobs::EigenDABlobSource;
 use op_alloy_genesis::{RollupConfig, SystemConfig};
+use async_trait::async_trait;
+use op_alloy_protocol::{BlockInfo, L2BlockInfo};
+use op_alloy_rpc_types_engine::OpAttributesWithParent;
 
 /// An oracle-backed payload attributes builder for the `AttributesQueue` stage of the derivation
 /// pipeline.
@@ -96,5 +99,86 @@ where
             .origin(sync_start.origin())
             .build();
         Self { pipeline, caching_oracle }
+    }
+}
+
+impl<O, B, A> DriverPipeline<OracleDerivationPipeline<O, B, A>> for OraclePipeline<O, B, A>
+where
+    O: CommsClient + FlushableCache + Send + Sync + Debug,
+    B: BlobProvider + Send + Sync + Debug + Clone,
+    A: EigenDABlobProvider + Send + Sync + Debug + Clone,
+{
+    /// Flushes the cache on re-org.
+    fn flush(&mut self) {
+        self.caching_oracle.flush();
+    }
+}
+
+#[async_trait]
+impl<O, B, A> SignalReceiver for OraclePipeline<O, B, A>
+where
+    O: CommsClient + FlushableCache + Send + Sync + Debug,
+    B: BlobProvider + Send + Sync + Debug + Clone,
+    A: EigenDABlobProvider + Send + Sync + Debug + Clone,
+{
+    /// Receives a signal from the driver.
+    async fn signal(&mut self, signal: Signal) -> PipelineResult<()> {
+        self.pipeline.signal(signal).await
+    }
+}
+
+impl<O, B, A> OriginProvider for OraclePipeline<O, B, A>
+where
+    O: CommsClient + FlushableCache + Send + Sync + Debug,
+    B: BlobProvider + Send + Sync + Debug + Clone,
+    A: EigenDABlobProvider + Send + Sync + Debug + Clone,
+{
+    /// Returns the optional L1 [BlockInfo] origin.
+    fn origin(&self) -> Option<BlockInfo> {
+        self.pipeline.origin()
+    }
+}
+
+impl<O, B, A> Iterator for OraclePipeline<O, B, A>
+where
+    O: CommsClient + FlushableCache + Send + Sync + Debug,
+    B: BlobProvider + Send + Sync + Debug + Clone,
+    A: EigenDABlobProvider + Send + Sync + Debug + Clone,
+{
+    type Item = OpAttributesWithParent;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pipeline.next()
+    }
+}
+
+#[async_trait]
+impl<O, B, A> Pipeline for OraclePipeline<O, B, A>
+where
+    O: CommsClient + FlushableCache + Send + Sync + Debug,
+    B: BlobProvider + Send + Sync + Debug + Clone,
+    A: EigenDABlobProvider + Send + Sync + Debug + Clone,
+{
+    /// Peeks at the next [OpAttributesWithParent] from the pipeline.
+    fn peek(&self) -> Option<&OpAttributesWithParent> {
+        self.pipeline.peek()
+    }
+
+    /// Attempts to progress the pipeline.
+    async fn step(&mut self, cursor: L2BlockInfo) -> StepResult {
+        self.pipeline.step(cursor).await
+    }
+
+    /// Returns the rollup config.
+    fn rollup_config(&self) -> &RollupConfig {
+        self.pipeline.rollup_config()
+    }
+
+    /// Returns the [SystemConfig] by L2 number.
+    async fn system_config_by_number(
+        &mut self,
+        number: u64,
+    ) -> Result<SystemConfig, PipelineErrorKind> {
+        self.pipeline.system_config_by_number(number).await
     }
 }

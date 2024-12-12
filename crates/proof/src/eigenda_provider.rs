@@ -8,6 +8,8 @@ use kona_preimage::{CommsClient, PreimageKey, PreimageKeyType};
 
 use kona_proof::errors::OracleProviderError;
 
+use crate::hint::HintType;
+
 /// The oracle-backed EigenDA provider for the client program.
 #[derive(Debug, Clone)]
 pub struct OracleEigenDAProvider<T: CommsClient> {
