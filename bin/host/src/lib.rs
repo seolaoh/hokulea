@@ -83,7 +83,7 @@ pub async fn start_server_and_native_client(cfg: HostCli) -> Result<i32> {
     // Execute both tasks and wait for them to complete.
     info!("Starting preimage server and client program.");
     let (_, client_result) = tokio::try_join!(server_task, program_task,)?;
-    info!(target: "kona_host", "Preimage server and client program have joined.");
+    info!(target: "hokulea_host", "Preimage server and client program have joined.");
 
     Ok(client_result.is_err() as i32)
 }

@@ -2,7 +2,9 @@
 
 use anyhow::Result;
 use clap::Parser;
-use kona_host::{init_tracing_subscriber, start_server, start_server_and_native_client, HostCli};
+use kona_host::{init_tracing_subscriber, start_server, HostCli};
+use hokulea_host::start_server_and_native_client;
+
 use tracing::{error, info};
 
 #[tokio::main(flavor = "multi_thread")]
@@ -16,7 +18,7 @@ async fn main() -> Result<()> {
         let status = match start_server_and_native_client(cfg).await {
             Ok(status) => status,
             Err(e) => {
-                error!(target: "kona_host", "Exited with an error: {:?}", e);
+                error!(target: "hokulea_host", "Exited with an error: {:?}", e);
                 panic!("{e}");
             }
         };
