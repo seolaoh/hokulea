@@ -16,5 +16,4 @@ impl EigenDABlobData {
         info!(target: "eigenda-blobdata", "decode {} {:?}", self.blob.len(), self.blob.clone());
         Ok(self.blob.clone())
     }
-
 }

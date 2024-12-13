@@ -1,13 +1,14 @@
-use kona_driver::{DriverPipeline, PipelineCursor};
-use kona_preimage::CommsClient;
-use kona_proof::{l1::OracleL1ChainProvider, l2::OracleL2ChainProvider, FlushableCache};
-use core::fmt::Debug;
 use alloc::{boxed::Box, sync::Arc};
+use async_trait::async_trait;
+use core::fmt::Debug;
+use eigenda::eigenda::EigenDADataSource;
+use eigenda::eigenda_blobs::EigenDABlobSource;
+use eigenda::traits::EigenDABlobProvider;
 use kona_derive::{
     attributes::StatefulAttributesBuilder,
     errors::PipelineErrorKind,
     pipeline::{DerivationPipeline, PipelineBuilder},
-    sources::{EthereumDataSource},
+    sources::EthereumDataSource,
     stages::{
         AttributesQueue, BatchProvider, BatchStream, ChannelProvider, ChannelReader, FrameQueue,
         L1Retrieval, L1Traversal,
@@ -15,11 +16,10 @@ use kona_derive::{
     traits::{BlobProvider, OriginProvider, Pipeline, SignalReceiver},
     types::{PipelineResult, Signal, StepResult},
 };
-use eigenda::traits::EigenDABlobProvider;
-use eigenda::eigenda::EigenDADataSource;
-use eigenda::eigenda_blobs::EigenDABlobSource;
+use kona_driver::{DriverPipeline, PipelineCursor};
+use kona_preimage::CommsClient;
+use kona_proof::{l1::OracleL1ChainProvider, l2::OracleL2ChainProvider, FlushableCache};
 use op_alloy_genesis::{RollupConfig, SystemConfig};
-use async_trait::async_trait;
 use op_alloy_protocol::{BlockInfo, L2BlockInfo};
 use op_alloy_rpc_types_engine::OpAttributesWithParent;
 
@@ -88,7 +88,7 @@ where
         );
         let dap = EthereumDataSource::new_from_parts(chain_provider.clone(), blob_provider, &cfg);
         let eigenda_blob_source = EigenDABlobSource::new(eigenda_blob_provider);
-        let dap =  EigenDADataSource::new(dap, eigenda_blob_source);
+        let dap = EigenDADataSource::new(dap, eigenda_blob_source);
 
         let pipeline = PipelineBuilder::new()
             .rollup_config(cfg)
@@ -98,7 +98,10 @@ where
             .builder(attributes)
             .origin(sync_start.origin())
             .build();
-        Self { pipeline, caching_oracle }
+        Self {
+            pipeline,
+            caching_oracle,
+        }
     }
 }
 

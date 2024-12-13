@@ -1,12 +1,15 @@
 extern crate alloc;
+use alloy_consensus::{Header, Sealed};
+use eigenda_proof::pipeline::OraclePipeline;
 use kona_client::FaultProofProgramError;
+use kona_driver::Driver;
 use kona_preimage::{
     CommsClient, HintWriterClient, PreimageKey, PreimageKeyType, PreimageOracleClient,
 };
-use eigenda_proof::pipeline::OraclePipeline;
-use kona_driver::{Driver};
-use alloy_consensus::{Header, Sealed};
 
+use alloc::sync::Arc;
+use core::fmt::Debug;
+use kona_executor::TrieDBProvider;
 use kona_proof::{
     errors::OracleProviderError,
     executor::KonaExecutor,
@@ -15,12 +18,7 @@ use kona_proof::{
     sync::new_pipeline_cursor,
     BootInfo, CachingOracle, HintType,
 };
-use core::fmt::Debug;
-use alloc::sync::Arc;
-use kona_executor::{ExecutorError, TrieDBProvider};
-use tracing::{error, info, warn};
-
-use eigenda_proof::pipeline::{OracleDataProvider, OracleDerivationPipeline};
+use tracing::{error, info};
 
 use eigenda_proof::eigenda_provider::OracleEigenDAProvider;
 
@@ -36,7 +34,11 @@ where
     //                          PROLOGUE                          //
     ////////////////////////////////////////////////////////////////
 
-    let oracle = Arc::new(CachingOracle::new(ORACLE_LRU_SIZE, oracle_client, hint_client));
+    let oracle = Arc::new(CachingOracle::new(
+        ORACLE_LRU_SIZE,
+        oracle_client,
+        hint_client,
+    ));
     let boot = match BootInfo::load(oracle.as_ref()).await {
         Ok(boot) => Arc::new(boot),
         Err(e) => {
@@ -96,8 +98,9 @@ where
 
     // Run the derivation pipeline until we are able to produce the output root of the claimed
     // L2 block.
-    let (number, output_root) =
-        driver.advance_to_target(&boot.rollup_config, Some(boot.claimed_l2_block_number)).await?;
+    let (number, output_root) = driver
+        .advance_to_target(&boot.rollup_config, Some(boot.claimed_l2_block_number))
+        .await?;
 
     ////////////////////////////////////////////////////////////////
     //                          EPILOGUE                          //
@@ -110,7 +113,10 @@ where
             number = number,
             output_root = output_root
         );
-        return Err(FaultProofProgramError::InvalidClaim(output_root, boot.claimed_l2_output_root));
+        return Err(FaultProofProgramError::InvalidClaim(
+            output_root,
+            boot.claimed_l2_output_root,
+        ));
     }
 
     info!(
@@ -146,8 +152,9 @@ where
         .await
         .map_err(OracleProviderError::Preimage)?;
 
-    let safe_hash =
-        output_preimage[96..128].try_into().map_err(OracleProviderError::SliceConversion)?;
+    let safe_hash = output_preimage[96..128]
+        .try_into()
+        .map_err(OracleProviderError::SliceConversion)?;
     l2_chain_provider
         .header_by_hash(safe_hash)
         .map(|header| Sealed::new_unchecked(header, safe_hash))

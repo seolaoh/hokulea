@@ -58,7 +58,9 @@ where
 {
     async fn get_preimage(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
         let kv_store = self.inner.read().await;
-        kv_store.get(key.into()).ok_or(PreimageOracleError::KeyNotFound)
+        kv_store
+            .get(key.into())
+            .ok_or(PreimageOracleError::KeyNotFound)
     }
 }
 

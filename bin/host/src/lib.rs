@@ -10,10 +10,12 @@ use server::PreimageServer;
 
 use kona_host::cli::{init_tracing_subscriber, HostCli};
 
-use kona_host::{kv};
+use kona_host::kv;
 
 use kona_client;
 
+use crate::eigenda_blobs::OnlineEigenDABlobProvider;
+use anyhow::{anyhow, Result};
 use fetcher::Fetcher;
 use kona_preimage::{
     BidirectionalChannel, HintReader, HintWriter, NativeChannel, OracleReader, OracleServer,
@@ -23,11 +25,6 @@ use kv::KeyValueStore;
 use std::sync::Arc;
 use tokio::{sync::RwLock, task};
 use tracing::info;
-use crate::{
-    eigenda_blobs::OnlineEigenDABlobProvider,
-};
-use anyhow::{anyhow, Result};
-
 
 /// Starts the [PreimageServer] and the client program in separate threads. The client program is
 /// ran natively in this mode.
@@ -48,9 +45,10 @@ pub async fn start_server_and_native_client(cfg: HostCli) -> Result<i32> {
         let eigenda_blob_provider = OnlineEigenDABlobProvider::new_http(
             //EIGENDA_ADDRESS.to_string(),
             "http://127.0.0.1:3100".to_string(),
-        ).await
+        )
+        .await
         .map_err(|e| anyhow!("Failed to load eigenda blob provider configuration: {e}"))?;
-        
+
         Some(Arc::new(RwLock::new(Fetcher::new(
             kv_store.clone(),
             l1_provider,
@@ -100,5 +98,7 @@ where
     let hint_reader = HintReader::new(hint_chan);
     let oracle_server = OracleServer::new(preimage_chan);
 
-    PreimageServer::new(oracle_server, hint_reader, kv_store, fetcher).start().await
+    PreimageServer::new(oracle_server, hint_reader, kv_store, fetcher)
+        .start()
+        .await
 }

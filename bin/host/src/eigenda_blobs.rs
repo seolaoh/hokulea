@@ -1,8 +1,6 @@
 use alloy_primitives::Bytes;
 use anyhow::Ok;
-use kona_derive::{errors::BlobProviderError, traits::BlobProvider};
-use reqwest::{header::GetAll, Client};
-use tracing::trace;
+use reqwest;
 
 /// An online implementation of the [EigenDABlobProvider] trait.
 #[derive(Debug, Clone)]
@@ -10,7 +8,7 @@ pub struct OnlineEigenDABlobProvider {
     /// The base url.
     base: String,
     /// The inner reqwest client. Used to talk to proxy
-    inner: Client,
+    inner: reqwest::Client,
 }
 
 const GET_METHOD: &str = "get";
@@ -22,7 +20,7 @@ impl OnlineEigenDABlobProvider {
     /// [OnlineEigenDABlobProvider] will attempt to load them dynamically at runtime if they are not
     /// provided.
     pub async fn new_http(base: String) -> Result<Self, anyhow::Error> {
-        let inner = Client::new();
+        let inner = reqwest::Client::new();
         Ok(Self { base, inner })
     }
 
@@ -31,14 +29,9 @@ impl OnlineEigenDABlobProvider {
         cert: &Bytes,
     ) -> Result<alloy_rlp::Bytes, reqwest::Error> {
         let url = format!("{}/{}/{}", self.base, GET_METHOD, cert.slice(1..));
-        
-        let raw_response = self.inner
-            .get(url)
-            .send()
-            .await?;
+
+        let raw_response = self.inner.get(url).send().await?;
 
         raw_response.bytes().await
     }
-
-    
 }

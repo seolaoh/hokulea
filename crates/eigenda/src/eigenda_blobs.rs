@@ -1,17 +1,17 @@
 //! Blob Data Source
 
 use crate::eigenda::EigenDADataSource;
-use crate::traits::EigenDABlobProvider;
 use crate::eigenda_data::EigenDABlobData;
+use crate::traits::EigenDABlobProvider;
 
+use alloc::{boxed::Box, string::ToString, vec::Vec};
+use alloy_primitives::{Address, Bytes};
+use async_trait::async_trait;
 use kona_derive::{
     errors::{BlobProviderError, PipelineError},
     traits::{BlobProvider, ChainProvider, DataAvailabilityProvider},
     types::PipelineResult,
 };
-use alloc::{boxed::Box, string::ToString, vec::Vec};
-use alloy_primitives::{Address, Bytes};
-use async_trait::async_trait;
 
 use op_alloy_protocol::{BlockInfo, Frame, DERIVATION_VERSION_0};
 
@@ -34,9 +34,7 @@ where
     B: EigenDABlobProvider + Send,
 {
     /// Creates a new blob source.
-    pub const fn new(
-        altda_fetcher: B,
-    ) -> Self {
+    pub const fn new(altda_fetcher: B) -> Self {
         Self {
             altda_fetcher,
             data: Vec::new(),
@@ -58,19 +56,18 @@ where
                 self.open = true;
                 let mut new_blob = data.clone();
                 // new_blob.truncate(data.len()-1);
-                let eigenda_blob = EigenDABlobData{ blob:new_blob } ;
+                let eigenda_blob = EigenDABlobData { blob: new_blob };
                 self.data.push(eigenda_blob);
-                
+
                 info!(target: "eigenda-blobsource", "load_blobs {:?}", self.data);
 
                 Ok(())
-            },
+            }
             Err(e) => {
                 self.open = true;
-                return Ok(())
-            
-            },
-        }   
+                return Ok(());
+            }
+        }
     }
 
     fn next_data(&mut self) -> Result<EigenDABlobData, PipelineResult<Bytes>> {
@@ -97,7 +94,7 @@ where
             Ok(d) => {
                 info!(target: "eigenda-blobsource", "next 3");
                 Ok(d)
-            },
+            }
             Err(_) => {
                 warn!(target: "blob-source", "Failed to decode blob data, skipping");
                 panic!()

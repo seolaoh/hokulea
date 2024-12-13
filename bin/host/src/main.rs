@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use clap::Parser;
-use kona_host::{init_tracing_subscriber, start_server, HostCli};
 use hokulea_host::start_server_and_native_client;
+use kona_host::{init_tracing_subscriber, start_server, HostCli};
 
 use tracing::{error, info};
 

@@ -18,8 +18,9 @@ pub(crate) const ACCELERATED_PRECOMPILES: &[PrecompileWithAddress] = &[
 
 /// Executes an accelerated precompile on [revm].
 pub(crate) fn execute<T: Into<Bytes>>(address: Address, input: T) -> Result<Vec<u8>> {
-    if let Some(precompile) =
-        ACCELERATED_PRECOMPILES.iter().find(|precompile| precompile.0 == address)
+    if let Some(precompile) = ACCELERATED_PRECOMPILES
+        .iter()
+        .find(|precompile| precompile.0 == address)
     {
         match precompile.1 {
             Precompile::Standard(std_precompile) => {

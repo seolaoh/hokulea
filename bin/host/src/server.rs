@@ -45,13 +45,18 @@ where
     /// Create a new [PreimageServer] with the given [PreimageOracleServer],
     /// [HintReaderServer], and [KeyValueStore]. Holds onto the file descriptors for the pipes
     /// that are created, so that the pipes are not closed until the server is dropped.
-    pub const fn    new(
+    pub const fn new(
         oracle_server: P,
         hint_reader: H,
         kv_store: Arc<RwLock<KV>>,
         fetcher: Option<Arc<RwLock<Fetcher<KV>>>>,
     ) -> Self {
-        Self { oracle_server, hint_reader, kv_store, fetcher }
+        Self {
+            oracle_server,
+            hint_reader,
+            kv_store,
+            fetcher,
+        }
     }
 
     /// Starts the [PreimageServer] and waits for incoming requests.
@@ -98,9 +103,17 @@ where
 
         info!("Starting oracle server");
         if let Some(fetcher) = fetcher.as_ref() {
-            do_loop(&OnlinePreimageFetcher::new(Arc::clone(fetcher)), &oracle_server).await
+            do_loop(
+                &OnlinePreimageFetcher::new(Arc::clone(fetcher)),
+                &oracle_server,
+            )
+            .await
         } else {
-            do_loop(&OfflinePreimageFetcher::new(Arc::clone(&kv_store)), &oracle_server).await
+            do_loop(
+                &OfflinePreimageFetcher::new(Arc::clone(&kv_store)),
+                &oracle_server,
+            )
+            .await
         }
     }
 

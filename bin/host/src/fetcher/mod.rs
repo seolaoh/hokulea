@@ -2,7 +2,6 @@
 //! remote source.
 
 use crate::eigenda_blobs::OnlineEigenDABlobProvider;
-use kona_host::{blobs::OnlineBlobProvider, kv::KeyValueStore};
 use alloy_consensus::{Header, TxEnvelope, EMPTY_ROOT_HASH};
 use alloy_eips::{
     eip2718::Encodable2718,
@@ -17,13 +16,14 @@ use alloy_rpc_types::{
     Transaction,
 };
 use anyhow::{anyhow, Result};
+use eigenda_proof::hint::{Hint, HintType};
+use kona_host::{blobs::OnlineBlobProvider, kv::KeyValueStore};
 use kona_preimage::{PreimageKey, PreimageKeyType};
-use eigenda_proof::hint::{HintType, Hint};
 use op_alloy_protocol::BlockInfo;
 use op_alloy_rpc_types_engine::OpPayloadAttributes;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, trace, warn, info};
+use tracing::{error, info, trace, warn};
 
 mod precompiles;
 
@@ -62,7 +62,15 @@ where
         l2_provider: ReqwestProvider,
         l2_head: B256,
     ) -> Self {
-        Self { kv_store, l1_provider, blob_provider, eigenda_blob_provider, l2_provider, l2_head, last_hint: None }
+        Self {
+            kv_store,
+            l1_provider,
+            blob_provider,
+            eigenda_blob_provider,
+            l2_provider,
+            l2_head,
+            last_hint: None,
+        }
     }
 
     /// Set the last hint to be received.
@@ -191,7 +199,10 @@ where
                 let index = u64::from_be_bytes(index_data_bytes);
                 let timestamp = u64::from_be_bytes(timestamp_data_bytes);
 
-                let partial_block_ref = BlockInfo { timestamp, ..Default::default() };
+                let partial_block_ref = BlockInfo {
+                    timestamp,
+                    ..Default::default()
+                };
                 let indexed_hash = IndexedBlobHash { index, hash };
 
                 // Fetch the blob sidecar from the blob provider.
@@ -336,7 +347,8 @@ where
                             encoded_transactions.push(tx);
                         }
 
-                        self.store_trie_nodes(encoded_transactions.as_slice()).await?;
+                        self.store_trie_nodes(encoded_transactions.as_slice())
+                            .await?;
                     }
                     _ => anyhow::bail!("Only BlockTransactions::Hashes are supported."),
                 };
@@ -375,8 +387,10 @@ where
                 };
 
                 let mut kv_write_lock = self.kv_store.write().await;
-                kv_write_lock
-                    .set(PreimageKey::new(*hash, PreimageKeyType::Keccak256).into(), code.into())?;
+                kv_write_lock.set(
+                    PreimageKey::new(*hash, PreimageKeyType::Keccak256).into(),
+                    code.into(),
+                )?;
             }
             HintType::StartingL2Output => {
                 const OUTPUT_ROOT_VERSION: u8 = 0;
@@ -468,12 +482,15 @@ where
                 let mut kv_write_lock = self.kv_store.write().await;
 
                 // Write the account proof nodes to the key-value store.
-                proof_response.account_proof.into_iter().try_for_each(|node| {
-                    let node_hash = keccak256(node.as_ref());
-                    let key = PreimageKey::new(*node_hash, PreimageKeyType::Keccak256);
-                    kv_write_lock.set(key.into(), node.into())?;
-                    Ok::<(), anyhow::Error>(())
-                })?;
+                proof_response
+                    .account_proof
+                    .into_iter()
+                    .try_for_each(|node| {
+                        let node_hash = keccak256(node.as_ref());
+                        let key = PreimageKey::new(*node_hash, PreimageKeyType::Keccak256);
+                        kv_write_lock.set(key.into(), node.into())?;
+                        Ok::<(), anyhow::Error>(())
+                    })?;
             }
             HintType::L2AccountStorageProof => {
                 if hint_data.len() != 8 + 20 + 32 {
@@ -498,12 +515,15 @@ where
                 let mut kv_write_lock = self.kv_store.write().await;
 
                 // Write the account proof nodes to the key-value store.
-                proof_response.account_proof.into_iter().try_for_each(|node| {
-                    let node_hash = keccak256(node.as_ref());
-                    let key = PreimageKey::new(*node_hash, PreimageKeyType::Keccak256);
-                    kv_write_lock.set(key.into(), node.into())?;
-                    Ok::<(), anyhow::Error>(())
-                })?;
+                proof_response
+                    .account_proof
+                    .into_iter()
+                    .try_for_each(|node| {
+                        let node_hash = keccak256(node.as_ref());
+                        let key = PreimageKey::new(*node_hash, PreimageKeyType::Keccak256);
+                        kv_write_lock.set(key.into(), node.into())?;
+                        Ok::<(), anyhow::Error>(())
+                    })?;
 
                 // Write the storage proof nodes to the key-value store.
                 let storage_proof = proof_response.storage_proof.remove(0);
@@ -540,7 +560,10 @@ where
                 let mut kv_write_lock = self.kv_store.write().await;
                 for (hash, preimage) in merged.into_iter() {
                     let computed_hash = keccak256(preimage.as_ref());
-                    assert_eq!(computed_hash, hash, "Preimage hash does not match expected hash");
+                    assert_eq!(
+                        computed_hash, hash,
+                        "Preimage hash does not match expected hash"
+                    );
 
                     let key = PreimageKey::new(*hash, PreimageKeyType::Keccak256);
                     kv_write_lock.set(key.into(), preimage.into())?;
@@ -551,10 +574,10 @@ where
                 info!(target: "fetcher", "Fetching AltDACommitment cert: {:?}", cert);
                 // Fetch the blob sidecar from the blob provider.
                 let eigenda_blob = self
-                    .eigenda_blob_provider.
-                    fetch_eigenda_blob(&cert).
-                    await.
-                    map_err(|e| anyhow!("Failed to fetch eigenda blob: {e}"))?;
+                    .eigenda_blob_provider
+                    .fetch_eigenda_blob(&cert)
+                    .await
+                    .map_err(|e| anyhow!("Failed to fetch eigenda blob: {e}"))?;
 
                 info!(target: "fetcher", "eigenda_blob len {}", eigenda_blob.len());
                 // Acquire a lock on the key-value store and set the preimages.
@@ -565,7 +588,6 @@ where
                     PreimageKey::new(*keccak256(cert), PreimageKeyType::GlobalGeneric).into(),
                     eigenda_blob.to_vec(),
                 )?;
-
             }
         }
 

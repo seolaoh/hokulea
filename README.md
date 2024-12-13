@@ -1,1 +1,3 @@
-# hokulea
+# Hokulea
+
+![](./hokulea.jpeg)

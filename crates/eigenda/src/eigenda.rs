@@ -3,14 +3,14 @@
 use crate::eigenda_blobs::EigenDABlobSource;
 use crate::traits::EigenDABlobProvider;
 
+use alloc::{boxed::Box, fmt::Debug};
+use alloy_primitives::Bytes;
+use async_trait::async_trait;
 use kona_derive::{
     sources::{BlobSource, CalldataSource, EthereumDataSource},
     traits::{BlobProvider, ChainProvider, DataAvailabilityProvider},
     types::PipelineResult,
 };
-use alloc::{boxed::Box, fmt::Debug};
-use alloy_primitives::Bytes;
-use async_trait::async_trait;
 use op_alloy_protocol::BlockInfo;
 
 /// A factory for creating an Ethereum data source provider.
@@ -38,7 +38,10 @@ where
         ethereum_source: EthereumDataSource<C, B>,
         eigenda_source: EigenDABlobSource<A>,
     ) -> Self {
-        Self { ethereum_source, eigenda_source }
+        Self {
+            ethereum_source,
+            eigenda_source,
+        }
     }
 }
 
@@ -61,7 +64,7 @@ where
         let eigenda_source_result = self.eigenda_source.next(&item).await;
         info!(target: "eigenda-datasource", "eigenda_source_result {:?}", eigenda_source_result);
         eigenda_source_result
-    } 
+    }
 
     fn clear(&mut self) {
         self.eigenda_source.clear();
