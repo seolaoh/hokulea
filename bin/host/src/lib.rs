@@ -14,6 +14,8 @@ use kona_host::kv;
 
 use kona_client;
 
+use hokulea_client;
+
 use crate::eigenda_blobs::OnlineEigenDABlobProvider;
 use anyhow::{anyhow, Result};
 use fetcher::Fetcher;
@@ -48,7 +50,7 @@ pub async fn start_server_and_native_client(cfg: HostCli) -> Result<i32> {
         )
         .await
         .map_err(|e| anyhow!("Failed to load eigenda blob provider configuration: {e}"))?;
-
+    info!(target: "host", "create fetch with eigenda_provider");
         Some(Arc::new(RwLock::new(Fetcher::new(
             kv_store.clone(),
             l1_provider,
@@ -72,10 +74,9 @@ pub async fn start_server_and_native_client(cfg: HostCli) -> Result<i32> {
     ));
 
     // Start the client program in a separate child process.
-    let program_task = task::spawn(kona_client::run(
+    let program_task = task::spawn(hokulea_client::run(
         OracleReader::new(preimage_chan.client),
         HintWriter::new(hint_chan.client),
-        None,
     ));
 
     // Execute both tasks and wait for them to complete.
