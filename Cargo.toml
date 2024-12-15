@@ -83,6 +83,7 @@ revm = { version = "16.0.0", default-features = false }
 rocksdb = { version = "0.22.0", default-features = false }
 
 eigenda = { path = "crates/eigenda", version = "0.1.0", default-features = false }
+hokulea-client = { path = "bin/client", version = "0.1.0", default-features = false }
 eigenda-proof = { path = "crates/proof", version = "0.1.0", default-features = false }
 
 [profile.dev]

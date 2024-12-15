@@ -1785,6 +1785,7 @@ dependencies = [
  "async-trait",
  "clap",
  "eigenda-proof",
+ "hokulea-client",
  "kona-client",
  "kona-derive",
  "kona-host",
