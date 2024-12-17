@@ -1,4 +1,4 @@
-pub mod fetcher;
+pub mod eigenda_fetcher;
 
 pub mod eigenda_blobs;
 
@@ -14,7 +14,7 @@ use kona_host::kv;
 
 use crate::eigenda_blobs::OnlineEigenDABlobProvider;
 use anyhow::{anyhow, Result};
-use fetcher::Fetcher;
+use eigenda_fetcher::FetcherWithEigenDASupport;
 use kona_preimage::{
     BidirectionalChannel, HintReader, HintWriter, NativeChannel, OracleReader, OracleServer,
 };
@@ -45,15 +45,17 @@ pub async fn start_server_and_native_client(cfg: HostCli) -> Result<i32> {
         )
         .await
         .map_err(|e| anyhow!("Failed to load eigenda blob provider configuration: {e}"))?;
-        info!(target: "host", "create fetch with eigenda_provider");
-        Some(Arc::new(RwLock::new(Fetcher::new(
-            kv_store.clone(),
-            l1_provider,
-            blob_provider,
-            eigenda_blob_provider,
-            l2_provider,
-            cfg.agreed_l2_head_hash,
-        ))))
+
+        Some(Arc::new(RwLock::new(
+            FetcherWithEigenDASupport::new_from_parts(
+                kv_store.clone(),
+                l1_provider,
+                blob_provider,
+                eigenda_blob_provider,
+                l2_provider,
+                cfg.agreed_l2_head_hash,
+            ),
+        )))
     } else {
         None
     };
@@ -84,7 +86,7 @@ pub async fn start_server_and_native_client(cfg: HostCli) -> Result<i32> {
 
 pub async fn start_native_preimage_server<KV>(
     kv_store: Arc<RwLock<KV>>,
-    fetcher: Option<Arc<RwLock<Fetcher<KV>>>>,
+    fetcher: Option<Arc<RwLock<FetcherWithEigenDASupport<KV>>>>,
     hint_chan: NativeChannel,
     preimage_chan: NativeChannel,
 ) -> Result<()>

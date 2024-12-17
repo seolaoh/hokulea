@@ -1,6 +1,6 @@
 //! Contains the implementations of the [HintRouter] and [PreimageFetcher] traits.]
 
-use crate::{fetcher::Fetcher, kv::KeyValueStore};
+use crate::{eigenda_fetcher::FetcherWithEigenDASupport, kv::KeyValueStore};
 use async_trait::async_trait;
 use kona_preimage::{
     errors::{PreimageOracleError, PreimageOracleResult},
@@ -9,13 +9,13 @@ use kona_preimage::{
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-/// A [Fetcher]-backed implementation of the [PreimageFetcher] trait.
+/// A [FetcherWithEigenDASupport]-backed implementation of the [PreimageFetcher] trait.
 #[derive(Debug)]
 pub struct OnlinePreimageFetcher<KV>
 where
     KV: KeyValueStore + ?Sized,
 {
-    inner: Arc<RwLock<Fetcher<KV>>>,
+    inner: Arc<RwLock<FetcherWithEigenDASupport<KV>>>,
 }
 
 #[async_trait]
@@ -36,8 +36,8 @@ impl<KV> OnlinePreimageFetcher<KV>
 where
     KV: KeyValueStore + ?Sized,
 {
-    /// Create a new [OnlinePreimageFetcher] from the given [Fetcher].
-    pub const fn new(fetcher: Arc<RwLock<Fetcher<KV>>>) -> Self {
+    /// Create a new [OnlinePreimageFetcher] from the given [FetcherWithEigenDASupport].
+    pub const fn new(fetcher: Arc<RwLock<FetcherWithEigenDASupport<KV>>>) -> Self {
         Self { inner: fetcher }
     }
 }
@@ -74,13 +74,13 @@ where
     }
 }
 
-/// A [Fetcher]-backed implementation of the [HintRouter] trait.
+/// A [FetcherWithEigenDASupport]-backed implementation of the [HintRouter] trait.
 #[derive(Debug)]
 pub struct OnlineHintRouter<KV>
 where
     KV: KeyValueStore + ?Sized,
 {
-    inner: Arc<RwLock<Fetcher<KV>>>,
+    inner: Arc<RwLock<FetcherWithEigenDASupport<KV>>>,
 }
 
 #[async_trait]
@@ -90,7 +90,9 @@ where
 {
     async fn route_hint(&self, hint: String) -> PreimageOracleResult<()> {
         let mut fetcher = self.inner.write().await;
-        fetcher.hint(&hint);
+        fetcher
+            .hint(&hint)
+            .map_err(|e| PreimageOracleError::Other(e.to_string()))?;
         Ok(())
     }
 }
@@ -99,19 +101,8 @@ impl<KV> OnlineHintRouter<KV>
 where
     KV: KeyValueStore + ?Sized,
 {
-    /// Create a new [OnlineHintRouter] from the given [Fetcher].
-    pub const fn new(fetcher: Arc<RwLock<Fetcher<KV>>>) -> Self {
+    /// Create a new [OnlineHintRouter] from the given [FetcherWithEigenDASupport].
+    pub const fn new(fetcher: Arc<RwLock<FetcherWithEigenDASupport<KV>>>) -> Self {
         Self { inner: fetcher }
-    }
-}
-
-/// An [OfflineHintRouter] is a [HintRouter] that does nothing.
-#[derive(Debug)]
-pub struct OfflineHintRouter;
-
-#[async_trait]
-impl HintRouter for OfflineHintRouter {
-    async fn route_hint(&self, _hint: String) -> PreimageOracleResult<()> {
-        Ok(())
     }
 }
