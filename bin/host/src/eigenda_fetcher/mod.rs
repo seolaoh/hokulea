@@ -8,14 +8,14 @@ use alloy_rlp::Decodable;
 use anyhow::{anyhow, Result};
 use core::panic;
 use hokulea_eigenda::BlobInfo;
-use hokulea_eigenda::BLOB_ENCODING_VERSION_0;
+use hokulea_eigenda::EigenDABlobData;
+use hokulea_eigenda::BYTES_PER_FIELD_ELEMENT;
 use hokulea_proof::hint::{ExtendedHint, ExtendedHintType};
 use kona_host::{blobs::OnlineBlobProvider, fetcher::Fetcher, kv::KeyValueStore};
 use kona_preimage::{PreimageKey, PreimageKeyType};
-use rust_kzg_bn254::helpers;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info, trace, warn};
+use tracing::{error, trace, warn};
 
 /// The [FetcherWithEigenDASupport] struct wraps and extends kona's [Fetcher] struct with the ability
 /// to fetch preimages from EigenDA.
@@ -141,44 +141,31 @@ where
 
         if hint_type == ExtendedHintType::EigenDACommitment {
             let cert = hint_data;
-            info!(target: "fetcher_with_eigenda_support", "Fetching eigenda commitment cert: {:?}", cert);
+            trace!(target: "fetcher_with_eigenda_support", "Fetching eigenda commitment cert: {:?}", cert);
             // Fetch the blob sidecar from the blob provider.
             let rollup_data = self
                 .eigenda_blob_provider
                 .fetch_eigenda_blob(&cert)
                 .await
                 .map_err(|e| anyhow!("Failed to fetch eigenda blob: {e}"))?;
-
             // Acquire a lock on the key-value store and set the preimages.
             let mut kv_write_lock = self.kv_store.write().await;
 
             // the fourth because 0x01010000 in the beginning is metadata
-            let rollup_data_len = rollup_data.len() as u32;
             let item_slice = cert.as_ref();
             let cert_blob_info = BlobInfo::decode(&mut &item_slice[4..]).unwrap();
 
-            // Todo ensure data_length is always power of 2. Proxy made mistake
-            let data_size = cert_blob_info.blob_header.data_length as u64;
-            let blob_length: u64 = data_size / 32;
+            // Proxy should return a cert whose data_length measured in symbol (i.e. 32 Bytes)
+            let blob_length = cert_blob_info.blob_header.data_length as u64;
+            warn!("blob length: {:?}", blob_length);
 
-            // encode to become raw blob
-            let codec_rollup_data = helpers::convert_by_padding_empty_byte(rollup_data.as_ref());
-            let codec_rollup_data_len = codec_rollup_data.len() as u32;
+            let eigenda_blob = EigenDABlobData::encode(rollup_data.as_ref());
 
-            let mut raw_blob = vec![0u8; data_size as usize];
-
-            if 32 + codec_rollup_data_len as u64 > data_size {
-                return Err(anyhow!("data size is less than reconstructed data codec_rollup_data_len {} data_size {}", codec_rollup_data_len, data_size));
+            if eigenda_blob.blob.len() != blob_length as usize * BYTES_PER_FIELD_ELEMENT {
+                return Err(
+                    anyhow!("data size from cert  does not equal to reconstructed data codec_rollup_data_len {} blob size {}", 
+                        eigenda_blob.blob.len(), blob_length as usize * BYTES_PER_FIELD_ELEMENT));
             }
-
-            // blob header
-            // https://github.com/Layr-Labs/eigenda/blob/f8b0d31d65b29e60172507074922668f4ca89420/api/clients/codecs/default_blob_codec.go#L25
-            // raw blob the immediate data just before taking IFFT
-            raw_blob[1] = BLOB_ENCODING_VERSION_0;
-            raw_blob[2..6].copy_from_slice(&rollup_data_len.to_be_bytes());
-
-            // encode length as uint32
-            raw_blob[32..(32 + codec_rollup_data_len as usize)].copy_from_slice(&codec_rollup_data);
 
             // Write all the field elements to the key-value store.
             // The preimage oracle key for each field element is the keccak256 hash of
@@ -189,7 +176,7 @@ where
             blob_key[..32].copy_from_slice(cert_blob_info.blob_header.commitment.x.as_ref());
             blob_key[32..64].copy_from_slice(cert_blob_info.blob_header.commitment.y.as_ref());
 
-            info!("cert_blob_info blob_length {:?}", blob_length);
+            trace!("cert_blob_info blob_length {:?}", blob_length);
 
             for i in 0..blob_length {
                 blob_key[88..].copy_from_slice(i.to_be_bytes().as_ref());
@@ -201,7 +188,7 @@ where
                 )?;
                 kv_write_lock.set(
                     PreimageKey::new(*blob_key_hash, PreimageKeyType::GlobalGeneric).into(),
-                    raw_blob[(i as usize) << 5..(i as usize + 1) << 5].to_vec(),
+                    eigenda_blob.blob[(i as usize) << 5..(i as usize + 1) << 5].to_vec(),
                 )?;
             }
 
