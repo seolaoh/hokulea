@@ -6,9 +6,10 @@ Hokulea is a library to provide the altda providers for a derivation pipeline bu
 
 First start the devnet:
 ```bash
-git clone https://github.com/ethereum-optimism/optimism.git
-cd optimism
-DEVNET_ALTDA=true GENERIC_ALTDA=true make devnet-up
+git clone -b v1.10.0 https://github.com/ethereum-optimism/optimism.git
+# this patches the optimism devnet to use the eigenda-proxy instead of their da-server
+git patch optimism/ops-bedrock/docker-compose.yml < op-devnet.docker-compose.yml.patch
+DEVNET_ALTDA=true GENERIC_ALTDA=true make -C ./optimism devnet-up
 ```
 Then run hokulea:
 ```bash
