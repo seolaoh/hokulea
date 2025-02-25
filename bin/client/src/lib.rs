@@ -8,6 +8,7 @@ use kona_preimage::{
 };
 
 use alloc::sync::Arc;
+
 use core::fmt::Debug;
 use kona_executor::TrieDBProvider;
 use kona_proof::{

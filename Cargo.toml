@@ -7,6 +7,7 @@ members = ["bin/*", "crates/*"]
 hokulea-client = { path = "bin/client", version = "0.1.0", default-features = false }
 hokulea-eigenda = { path = "crates/eigenda", version = "0.1.0", default-features = false }
 hokulea-proof = { path = "crates/proof", version = "0.1.0", default-features = false }
+hokulea-compute-kzg-proof = { path = "crates/compute-kzg-proof", version = "0.1.0", default-features = false }
 
 # Kona
 # We use git dependencies instead of version dependencies because Kona is moving very fast right now
@@ -60,16 +61,25 @@ tokio = "1.42.0"
 async-channel = "2.3.1"
 cfg-if = "1.0.0"
 reqwest = "0.12.12"
-async-trait = "0.1.85"
+async-trait = "0.1.81"
 linked_list_allocator = "0.10.5"
 bytes = "1.9.0"
+num = "0.4"
 
 # General
 sha2 = { version = "0.10.8", default-features = false }
 c-kzg = { version = "2.0.0", default-features = false }
 anyhow = { version = "1.0.95", default-features = false }
 thiserror = { version = "2.0.9", default-features = false }
-rust-kzg-bn254 = { version = "0.2.1", default-features = false }
+rust-kzg-bn254-primitives = { git = "https://github.com/Layr-Labs/rust-kzg-bn254", rev = "b3e532e9aad533009849755d5ad7b9578a16bfb2", default-features = false }
+rust-kzg-bn254-prover = { git = "https://github.com/Layr-Labs/rust-kzg-bn254", rev = "b3e532e9aad533009849755d5ad7b9578a16bfb2", default-features = false }
+rust-kzg-bn254-verifier = { git = "https://github.com/Layr-Labs/rust-kzg-bn254", rev = "b3e532e9aad533009849755d5ad7b9578a16bfb2", default-features = false }
+
+# EigenDA v2 struct
+eigenda-v2-struct-rust = { git = "https://github.com/bxue-l2/eigenda-v2-struct-rust", rev = "1ceba2f777bc842c414d43911763581e5300e7d5" }
+
+ark-bn254 = "0.5.0"
+ark-ff = { version = "0.5.0", features = ["parallel"] }
 
 # Tracing
 tracing-loki = "0.2.5"
@@ -92,6 +102,9 @@ revm = { version = "16.0.0", default-features = false }
 
 # K/V database
 rocksdb = { version = "0.22.0", default-features = false }
+
+# ZKVM
+risc0-zkvm = { version = "1.2.3", features = ["heap-embedded-alloc", "unstable"] }
 
 [profile.dev]
 opt-level = 3
