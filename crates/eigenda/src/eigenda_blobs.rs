@@ -1,9 +1,7 @@
 //! Blob Data Source
 
 use crate::traits::EigenDABlobProvider;
-use crate::{eigenda_data::EigenDABlobData, CertVersion};
-use alloy_rlp::Decodable;
-use eigenda_v2_struct_rust::EigenDAV2Cert;
+use crate::{eigenda_data::EigenDABlobData, AltDACommitment};
 
 use alloc::vec::Vec;
 use alloy_primitives::Bytes;
@@ -40,7 +38,7 @@ where
     }
 
     /// Fetches the next blob from the source.
-    pub async fn next(&mut self, eigenda_commitment: &Bytes) -> PipelineResult<Bytes> {
+    pub async fn next(&mut self, eigenda_commitment: &AltDACommitment) -> PipelineResult<Bytes> {
         self.load_blobs(eigenda_commitment).await?;
         let next_data = match self.next_data() {
             Ok(d) => d,
@@ -64,22 +62,15 @@ where
     }
 
     /// Loads blob data into the source if it is not open.
-    async fn load_blobs(&mut self, eigenda_commitment: &Bytes) -> Result<(), BlobProviderError> {
+    async fn load_blobs(
+        &mut self,
+        eigenda_commitment: &AltDACommitment,
+    ) -> Result<(), BlobProviderError> {
         if self.open {
             return Ok(());
         }
 
-        let cert_version: CertVersion = eigenda_commitment.as_ref()[3].into();
-        let data = match cert_version {
-            CertVersion::Version1 => self.eigenda_fetcher.get_blob(eigenda_commitment).await,
-            CertVersion::Version2 => {
-                let eigenda_v2_cert =
-                    EigenDAV2Cert::decode(&mut &eigenda_commitment.as_ref()[4..]).unwrap();
-                self.eigenda_fetcher.get_blob_v2(&eigenda_v2_cert).await
-            }
-        };
-
-        match data {
+        match self.eigenda_fetcher.get_blob(eigenda_commitment).await {
             Ok(data) => {
                 self.open = true;
                 let new_blob: Vec<u8> = data.into();

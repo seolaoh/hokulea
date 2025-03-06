@@ -2513,12 +2513,14 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
+ "anyhow",
  "async-trait",
  "bytes",
  "eigenda-v2-struct-rust",
  "kona-derive",
  "maili-protocol",
  "rust-kzg-bn254-primitives",
+ "thiserror 2.0.12",
  "tracing",
 ]
 
@@ -2531,7 +2533,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
- "eigenda-v2-struct-rust",
  "hokulea-client",
  "hokulea-eigenda",
  "hokulea-proof",

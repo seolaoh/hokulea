@@ -1,21 +1,19 @@
 //! Contains the [EigenDADataSource], which is a concrete implementation of the
 //! [DataAvailabilityProvider] trait for the EigenDA protocol.
-
 use crate::eigenda_blobs::EigenDABlobSource;
 use crate::traits::EigenDABlobProvider;
-use crate::{BlobInfo, CertVersion};
-use alloy_rlp::Decodable;
+use crate::AltDACommitment;
 
 use alloc::{boxed::Box, fmt::Debug};
 use alloy_primitives::Bytes;
 use async_trait::async_trait;
 use kona_derive::{
-    //errors::{PipelineError, PipelineErrorKind},
+    errors::PipelineError,
     sources::EthereumDataSource,
     traits::{BlobProvider, ChainProvider, DataAvailabilityProvider},
     types::PipelineResult,
 };
-use maili_protocol::BlockInfo;
+use maili_protocol::{BlockInfo, DERIVATION_VERSION_0};
 
 /// A factory for creating an Ethereum data source provider.
 #[derive(Debug, Clone)]
@@ -59,56 +57,34 @@ where
     type Item = Bytes;
 
     async fn next(&mut self, block_ref: &BlockInfo) -> PipelineResult<Self::Item> {
-        // then acutally use ethereum da to fetch. items are Bytes
-        let cert = self.ethereum_source.next(block_ref).await?;
-        //let l1_block_number = block_ref.number;
+        // data is either an op channel frame or an eigenda cert
+        let data = self.ethereum_source.next(block_ref).await?;
 
-        let cert_version_byte = cert.as_ref()[3];
-        let cert_version: CertVersion = cert_version_byte.into();
-        match cert_version {
-            CertVersion::Version1 => {
-                // TODO if punctuality is checked elsewhere, then we don't need to deserialize here
-                let cert_blob_info = BlobInfo::decode(&mut &cert.as_ref()[4..]).unwrap();
-                info!("cert_blob_info {:?}", cert_blob_info);
-                //let rbn = cert_blob_info
-                //    .blob_verification_proof
-                //    .batch_medatada
-                //    .batch_header
-                //    .reference_block_number as u64;
-
-                // check staleness
-                // TODO: this would require the op-rollup to follow the same pattern
-                // but passing blockId to proxy which implement the logic,
-                // see https://github.com/ethereum-optimism/optimism/blob/0bb2ff57c8133f1e3983820c0bf238001eca119b/op-alt-da/damgr.go#L211
-                //if rbn + STALE_GAP < l1_block_number {
-                // TODO: double check
-                //    return Err(PipelineErrorKind::Temporary(PipelineError::EndOfSource));
-                //}
-
-                let eigenda_blob = self.eigenda_source.next(&cert).await?;
-                Ok(eigenda_blob)
-            }
-            CertVersion::Version2 => {
-                // TODO if punctuality is checked elsewhere, then we don't need to deserialize here
-                //let eigenda_v2_cert = match EigenDAV2Cert::decode(&mut &cert.as_ref()[4..]) {
-                //    Ok(c) => c,
-                //    Err(_e) => {
-                //        return Err(PipelineErrorKind::Temporary(PipelineError::EndOfSource))
-                //    }
-                //};
-                //let rbn = eigenda_v2_cert.batch_header_v2.reference_block_number as u64;
-                // check staleness
-                // TODO: this would require the op-rollup to follow the same pattern
-                // but passing blockId to proxy which implement the logic,
-                // see https://github.com/ethereum-optimism/optimism/blob/0bb2ff57c8133f1e3983820c0bf238001eca119b/op-alt-da/damgr.go#L211
-                //if rbn + STALE_GAP < l1_block_number {
-                // TODO: double check
-                //    return Err(PipelineErrorKind::Temporary(PipelineError::EndOfSource));
-                //}
-                let eigenda_blob = self.eigenda_source.next(&cert).await?;
-                Ok(eigenda_blob)
-            }
+        // if data is op channel framce
+        if data[0] == DERIVATION_VERSION_0 {
+            // see https://github.com/op-rs/kona/blob/ace7c8918be672c1761eba3bd7480cdc1f4fa115/crates/protocol/protocol/src/frame.rs#L140
+            return Ok(data);
         }
+        if data.len() <= 2 {
+            return Err(PipelineError::NotEnoughData.temp());
+        }
+
+        let altda_commitment: AltDACommitment = match data[1..].try_into() {
+            Ok(a) => a,
+            Err(e) => {
+                // same handling procudure as in kona
+                // https://github.com/op-rs/kona/blob/ace7c8918be672c1761eba3bd7480cdc1f4fa115/crates/protocol/derive/src/stages/frame_queue.rs#L130
+                // https://github.com/op-rs/kona/blob/ace7c8918be672c1761eba3bd7480cdc1f4fa115/crates/protocol/derive/src/stages/frame_queue.rs#L165
+                error!("failed to parse altda commitment {}", e);
+                return Err(PipelineError::NotEnoughData.temp());
+            }
+        };
+
+        // see https://github.com/ethereum-optimism/optimism/blob/0bb2ff57c8133f1e3983820c0bf238001eca119b/op-alt-da/damgr.go#L211
+        // TODO check rbn + STALE_GAP < l1_block_number {
+
+        let eigenda_blob = self.eigenda_source.next(&altda_commitment).await?;
+        Ok(eigenda_blob)
     }
 
     fn clear(&mut self) {
