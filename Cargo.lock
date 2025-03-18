@@ -2488,9 +2488,28 @@ name = "hokulea-client"
 version = "0.1.0"
 dependencies = [
  "alloy-consensus",
+ "alloy-primitives",
+ "async-trait",
+ "hokulea-compute-proof",
+ "hokulea-eigenda",
  "hokulea-proof",
  "kona-client",
+ "kona-derive",
  "kona-driver",
+ "kona-executor",
+ "kona-preimage",
+ "kona-proof",
+ "rust-kzg-bn254-primitives",
+ "tracing",
+]
+
+[[package]]
+name = "hokulea-client-bin"
+version = "0.1.0"
+dependencies = [
+ "hokulea-client",
+ "hokulea-proof",
+ "kona-client",
  "kona-executor",
  "kona-preimage",
  "kona-proof",
@@ -2498,11 +2517,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "hokulea-compute-kzg-proof"
+name = "hokulea-compute-proof"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
+ "eigenda-v2-struct-rust",
  "num",
+ "risc0-zkvm",
  "rust-kzg-bn254-primitives",
  "rust-kzg-bn254-prover",
 ]
@@ -2525,7 +2546,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hokulea-host"
+name = "hokulea-host-bin"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
@@ -2533,7 +2554,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
- "hokulea-client",
+ "hokulea-client-bin",
  "hokulea-eigenda",
  "hokulea-proof",
  "kona-host",
