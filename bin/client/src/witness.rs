@@ -35,7 +35,7 @@ impl<T: EigenDABlobProvider + Send> EigenDABlobProvider for OracleEigenDAWitness
     async fn get_blob(&mut self, altda_commitment: &AltDACommitment) -> Result<Blob, Self::Error> {
         // V1 is not supported for secure integration, feel free to contribute
         let cert = match &altda_commitment.versioned_cert {
-            EigenDAVersionedCert::V1(_) => panic!("secure v1 integraiton is not supported"),
+            EigenDAVersionedCert::V1(_) => panic!("secure v1 integration is not supported"),
             EigenDAVersionedCert::V2(c) => c,
         };
 
@@ -45,7 +45,7 @@ impl<T: EigenDABlobProvider + Send> EigenDABlobProvider for OracleEigenDAWitness
         // Compute kzg proof for the entire blob on a deterministic random point
         let kzg_proof = match compute_kzg_proof(blob.data()) {
             Ok(p) => p,
-            Err(e) => panic!("cannot generate a kzg proof {}", e),
+            Err(e) => panic!("cannot generate a kzg proof: {}", e),
         };
 
         // populate witness struct
