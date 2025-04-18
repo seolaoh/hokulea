@@ -1,0 +1,31 @@
+name: Kurtosis Devnet
+
+on:
+  push:
+    branches: [master]
+  merge_group:
+  pull_request:
+
+env:
+  MISE_VERSION: 2024.12.14
+
+jobs:
+  kurtosis_devnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - run: just run-kurtosis-devnet
+      - uses: Swatinem/rust-cache@v2 # cache for `just build-native`
+      # We build the client here because `just run-client-native-against-devnet`
+      # first polls op-geth for a first finalized block, which takes a few minutes,
+      # and only after that runs `cargo run` which then builds the client, and takes another
+      # few minutes. Better to build here while waiting for first l2 block to finalize.
+      - run: just build-native
+      # We run this explicitly here even though its run implicitly as a dependency of `run-client-native-against-devnet`
+      # just so that we can see the breakdown timing requirements for each step.
+      - run: just _kurtosis_wait_for_first_l2_finalized_block
+      - run: just run-client-native-against-devnet
