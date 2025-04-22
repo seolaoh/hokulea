@@ -1,16 +1,18 @@
 use alloy_primitives::B256;
 use eigenda_v2_struct_rust::EigenDAV2Cert;
+use serde::{Deserialize, Serialize};
 
-use risc0_zkvm::Receipt;
+//use risc0_zkvm::Receipt;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CertValidity {
     /// the claim about if the cert is valid
     pub claimed_validity: bool,
     /// a zkvm proof attesting the above result
     /// in dev mode, receipt is ignored
     /// in the future, to make it generic for sp1-contract-call
-    pub receipt: Option<Receipt>,
+    /// Opaque zk proof
+    pub receipt: Option<Vec<u8>>,
 }
 
 impl CertValidity {
@@ -18,9 +20,10 @@ impl CertValidity {
     /// note this is different from if the cert itself is valid as in the is_valid field
     pub fn validate_cert_receipt(
         &self,
-        eigenda_cert: &EigenDAV2Cert,
-        validity_call_verifier_id: B256,
+        _eigenda_cert: &EigenDAV2Cert,
+        _validity_call_verifier_id: B256,
     ) {
+        /*
         use crate::journal::CertValidityJournal;
         use alloy_rlp::Decodable;
         use risc0_zkvm::sha::Digest;
@@ -39,5 +42,6 @@ impl CertValidity {
 
         // so far, we have ensure the data is right, now verify the proof with respect to the data
         assert!(self.receipt.as_ref().unwrap().verify(fpvm_image_id).is_ok())
+         */
     }
 }

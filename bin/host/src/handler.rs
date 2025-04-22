@@ -61,7 +61,6 @@ pub async fn fetch_eigenda_hint(
 ) -> Result<()> {
     let hint_type = hint.ty;
     let altda_commitment_bytes = hint.data;
-
     trace!(target: "fetcher_with_eigenda_support", "Fetching hint: {hint_type} {altda_commitment_bytes}");
 
     // Fetch the blob sidecar from the blob provider.
@@ -98,7 +97,7 @@ pub async fn fetch_eigenda_hint(
     };
 
     let eigenda_blob = EigenDABlobData::encode(rollup_data.as_ref(), PAYLOAD_ENCODING_VERSION_0);
-
+    println!("eigenda_blob.blob.len() {}", eigenda_blob.blob.len());
     // Acquire a lock on the key-value store and set the preimages.
     let mut kv_write_lock = kv.write().await;
 
@@ -116,7 +115,6 @@ pub async fn fetch_eigenda_hint(
             PreimageKey::new(*blob_key_hash, PreimageKeyType::Keccak256).into(),
             field_element_key.into(),
         )?;
-
         if i < fetch_num_element {
             kv_write_lock.set(
                 PreimageKey::new(*blob_key_hash, PreimageKeyType::GlobalGeneric).into(),

@@ -9,7 +9,6 @@ use tracing::info;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     let cfg = SingleChainHostWithEigenDA::try_parse()?;
-    println!("Starting host program with config: {:#?}", cfg);
     init_tracing_subscriber(cfg.verbose)?;
 
     cfg.start().await?;
