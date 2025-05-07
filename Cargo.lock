@@ -2412,6 +2412,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "hokulea-example-preloader"
+version = "0.1.0"
+dependencies = [
+ "alloy-evm",
+ "anyhow",
+ "clap",
+ "hokulea-client",
+ "hokulea-host-bin",
+ "hokulea-proof",
+ "hokulea-witgen",
+ "kona-client",
+ "kona-preimage",
+ "kona-proof",
+ "op-alloy-consensus",
+ "op-revm",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "hokulea-host-bin"
 version = "0.1.0"
 dependencies = [
@@ -2462,23 +2482,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "hokulea-witgen-client"
+name = "hokulea-witgen"
 version = "0.1.0"
 dependencies = [
- "alloy-evm",
  "alloy-primitives",
  "async-trait",
- "hokulea-client",
  "hokulea-compute-proof",
  "hokulea-eigenda",
  "hokulea-proof",
- "kona-client",
- "kona-preimage",
- "kona-proof",
- "op-alloy-consensus",
- "op-revm",
  "rust-kzg-bn254-primitives",
- "tracing",
 ]
 
 [[package]]
