@@ -1,0 +1,21 @@
+[package]
+name = "canoe-steel-apps"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alloy-provider = { version = "0.14" }
+alloy-sol-types = { workspace = true }
+url = {workspace = true }
+
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+canoe-steel-methods = { workspace = true }
+risc0-steel = { workspace = true, features = ["host"] }
+risc0-zkvm = { workspace = true, features = ["client", "bonsai"] }
+tokio = { workspace = true }
+eigenda-v2-struct = { workspace = true }
+canoe-provider.workspace = true
+canoe-bindings.workspace = true
+hokulea-proof.workspace = true
+tracing.workspace = true

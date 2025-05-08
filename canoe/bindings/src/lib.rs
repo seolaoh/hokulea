@@ -1,4 +1,15 @@
+#![no_std]
+
 use alloy_sol_types::sol;
+
+sol! {
+    struct Journal {
+        bytes32 blockhash;
+        address contractAddress;
+        bytes input;
+        bool output;
+    }
+}
 
 sol! {
     struct BatchHeaderV2 {
@@ -56,16 +67,19 @@ sol! {
 
     interface IEigenDACertVerifier {
         #[sol(rpc)]
-        function verifyDACertV2(
-            BatchHeaderV2 calldata batchHeader,
-            BlobInclusionInfo calldata blobInclusionInfo,
-            NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
-        ) external view;
-        #[sol(rpc)]
         function verifyDACertV2ForZKProof(
             BatchHeaderV2 calldata batchHeader,
             BlobInclusionInfo calldata blobInclusionInfo,
             NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
+        ) external view returns (bool);
+    }
+
+    interface IEigenDACertMockVerifier {
+        function verifyDACertV2ForZKProof(
+            BatchHeaderV2 calldata batchHeader,
+            BlobInclusionInfo calldata blobInclusionInfo,
+            NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+            bytes signedQuorumNumbers
         ) external view returns (bool);
     }
 

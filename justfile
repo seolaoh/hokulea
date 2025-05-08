@@ -74,7 +74,7 @@ _kurtosis_wait_for_first_l2_finalized_block chain_id='2151908':
 
 # Run the client program natively with the host program attached, against the op-devnet.
 [group('local-env')]
-run-client-against-devnet native_or_asterisc='native' native_bin_target='hokulea-host-bin' verbosity='' block_number='' rollup_config_path='rollup.json' enclave='eigenda-devnet' chain_id='2151908': (download-srs) (_download-rollup-config-from-kurtosis) (_kurtosis_wait_for_first_l2_finalized_block)
+run-client-against-devnet native_or_asterisc='native' bin_target='hokulea-host-bin' features='' mock_mode='' verbosity='' block_number='' rollup_config_path='rollup.json' enclave='eigenda-devnet' chain_id='2151908': (download-srs) (_download-rollup-config-from-kurtosis) (_kurtosis_wait_for_first_l2_finalized_block)
   #!/usr/bin/env bash
   set -o errexit -o nounset -o pipefail
   export FOUNDRY_DISABLE_NIGHTLY_WARNING=true
@@ -101,7 +101,7 @@ run-client-against-devnet native_or_asterisc='native' native_bin_target='hokulea
   set -x
   just run-client $BLOCK_NUMBER \
     $L1_RPC $L1_BEACON_RPC $L2_RPC $ROLLUP_NODE_RPC $EIGENDA_PROXY_RPC \
-    {{native_or_asterisc}} {{native_bin_target}} $ROLLUP_CONFIG_PATH {{verbosity}}
+    {{native_or_asterisc}} {{bin_target}} $ROLLUP_CONFIG_PATH {{features}} {{mock_mode}} {{verbosity}}
 
 [group('local-env')]
 run-kurtosis-devnet ENCLAVE_NAME="eigenda-devnet" ARGS_FILE="kurtosis_params.yaml":
@@ -112,6 +112,17 @@ run-kurtosis-devnet ENCLAVE_NAME="eigenda-devnet" ARGS_FILE="kurtosis_params.yam
 [group('local-env')]
 run-kurtosis-devnet-with-cached-images ENCLAVE_NAME="eigenda-devnet" ARGS_FILE="kurtosis_params.yaml":
   kurtosis run --enclave {{ENCLAVE_NAME}} github.com/ethpandaops/optimism-package --args-file {{ARGS_FILE}}
+
+# Deploy a mock contract that always return true. Designed to work with a devnet that uses eigenda-proxy memstore feature
+# which does not return a legitimate DA cert
+[group('local-env')]
+deploy-mock-contract ENCLAVE_NAME="eigenda-devnet":
+  #!/usr/bin/env bash
+  set -o errexit -o nounset -o pipefail
+  cd canoe/contracts/mock
+  L1_RPC="http://$(kurtosis port print {{ENCLAVE_NAME}} el-1-geth-teku rpc)"
+  DEVNET_PRIVATE_KEY=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
+  forge script script/DeployEigenDACertMockVerifier.s.sol --rpc-url $L1_RPC --private-key $DEVNET_PRIVATE_KEY --broadcast
 
 ############################### STYLE ###############################
 
@@ -133,7 +144,7 @@ lint: lint-native lint-docs
 alias l := lint-native
 [group('style')]
 lint-native: fmt-native-check lint-docs
-  cargo clippy --workspace --all --all-features --all-targets -- -D warnings
+  RISC0_SKIP_BUILD=1 cargo clippy --workspace --all --all-features --all-targets -- -D warnings
 
 # Lint the Rust documentation
 [group('style')]
@@ -188,7 +199,7 @@ test-docs:
 
 
 ############################## RUN CLIENT #################################
-run-client block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc eigenda_proxy_rpc native_or_asterisc='native' bin='hokulea-host-bin' rollup_config_path='' verbosity='':
+run-client block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc eigenda_proxy_rpc native_or_asterisc='native' bin='hokulea-host-bin' rollup_config_path='' features='' mock_mode='true' verbosity='':
   #!/usr/bin/env bash
   set -o errexit -o nounset -o pipefail
 
@@ -224,9 +235,20 @@ run-client block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc eigenda_prox
   rm -rf ./data
   mkdir ./data
 
+  if [ "{{mock_mode}}" == 'true' ]; then
+    set -a
+      RISC0_DEV_MODE=true
+    set +a
+  fi
+
+  FEATURES_FLAGS=""
+  if [ "{{features}}" != '' ]; then
+    FEATURES_FLAGS="--features {{features}}"
+  fi
+
   if [ "$NATIVE_OR_ASTERISC" = "native" ]; then
     echo "Running host program with native client program..."
-    cargo r --bin {{bin}}  -- \
+    cargo r --bin {{bin}} $FEATURES_FLAGS  -- \
       --l1-head $L1_HEAD \
       --agreed-l2-head-hash $AGREED_L2_HEAD_HASH \
       --claimed-l2-output-root $CLAIMED_L2_OUTPUT_ROOT \

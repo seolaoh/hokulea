@@ -15,13 +15,25 @@ anyhow.workspace = true
 tracing.workspace = true
 tokio = { workspace = true, features = ["full"] }
 clap = { workspace = true, features = ["derive", "env"] }
+cfg-if = { workspace = true }
+serde_json = { workspace = true }
 
 kona-client.workspace = true
 kona-preimage.workspace = true
 kona-proof.workspace = true
 
+canoe-provider  = { workspace = true }
+canoe-steel-apps = { workspace = true, optional = true }
+
+alloy-consensus.workspace = true
+alloy-rlp.workspace = true
 
 # Execution
 alloy-evm.workspace = true
 op-revm.workspace = true
 op-alloy-consensus.workspace = true
+
+[features]
+default = []
+steel = ["canoe-steel-apps", "hokulea-proof/steel"]
+#sp1-contract-call = ["canoe-sp1-contract-call-host"]
