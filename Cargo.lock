@@ -2332,10 +2332,10 @@ dependencies = [
 name = "canoe-provider"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives 1.1.0",
  "anyhow",
  "async-trait",
  "eigenda-v2-struct",
- "hokulea-proof",
  "serde",
 ]
 
@@ -2364,7 +2364,6 @@ dependencies = [
  "bincode",
  "canoe-bindings",
  "canoe-provider",
- "eigenda-v2-struct",
  "hokulea-proof",
  "sp1-build",
  "sp1-cc-client-executor",
@@ -2385,7 +2384,6 @@ dependencies = [
  "canoe-bindings",
  "canoe-provider",
  "canoe-steel-methods",
- "eigenda-v2-struct",
  "hokulea-proof",
  "risc0-steel",
  "risc0-zkvm",
@@ -4021,41 +4019,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "hokulea-example-common-preloader"
+name = "hokulea-example-preloader"
 version = "0.1.0"
 dependencies = [
  "alloy-consensus 0.15.10",
  "alloy-evm 0.6.0",
  "alloy-rlp",
- "canoe-provider",
- "hokulea-client",
- "hokulea-proof",
- "hokulea-witgen",
- "kona-client",
- "kona-preimage",
- "kona-proof",
- "op-alloy-consensus 0.15.4",
- "op-revm",
- "serde_json",
- "tracing",
-]
-
-[[package]]
-name = "hokulea-example-preloader"
-version = "0.1.0"
-dependencies = [
  "anyhow",
  "canoe-provider",
  "canoe-sp1-cc-host",
  "canoe-steel-apps",
  "cfg-if",
  "clap",
- "hokulea-example-common-preloader",
+ "hokulea-client",
  "hokulea-host-bin",
  "hokulea-proof",
+ "hokulea-witgen",
+ "hokulea-zkvm-verification",
  "kona-client",
  "kona-preimage",
+ "kona-proof",
+ "op-alloy-consensus 0.15.4",
+ "op-revm",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4116,11 +4103,23 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives 1.1.0",
  "async-trait",
+ "canoe-provider",
  "eigenda-v2-struct",
  "hokulea-compute-proof",
  "hokulea-eigenda",
  "hokulea-proof",
  "rust-kzg-bn254-primitives",
+ "serde_json",
+]
+
+[[package]]
+name = "hokulea-zkvm-verification"
+version = "0.1.0"
+dependencies = [
+ "hokulea-proof",
+ "kona-client",
+ "kona-preimage",
+ "kona-proof",
 ]
 
 [[package]]

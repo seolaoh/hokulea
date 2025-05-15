@@ -81,8 +81,7 @@ fn populate_witness(
     witness.eigenda_certs.push(cert.clone());
     witness.validity.push(CertValidity {
         claimed_validity: cert_validity,
-        receipt: Vec::new(),
+        canoe_proof: Vec::new(),
         l1_head_block_hash: B256::ZERO,
-        l1_head_block_number: 0,
     });
 }

@@ -13,9 +13,7 @@ pub struct CertValidity {
     /// the claim about if the cert is valid
     pub claimed_validity: bool,
     /// a zkvm proof attesting the above result    
-    pub receipt: Vec<u8>,
+    pub canoe_proof: Vec<u8>,
     /// block hash where view call anchored at, l1_head comes from kona_cfg    
     pub l1_head_block_hash: B256,
-    /// block number corresponding to the hash above. This is checked against l1_head_block_hash in the zk view proof
-    pub l1_head_block_number: u64,
 }

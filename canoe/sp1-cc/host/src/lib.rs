@@ -1,12 +1,12 @@
 use alloy_primitives::Address;
 use alloy_provider::RootProvider;
 use alloy_rpc_types::BlockNumberOrTag;
-use alloy_sol_types::SolValue;
+use alloy_sol_types::{sol_data::Bool, SolType, SolValue};
 use anyhow::Result;
 use async_trait::async_trait;
 use canoe_bindings::{IEigenDACertMockVerifier, Journal};
-use canoe_provider::CanoeProvider;
-use hokulea_proof::{canoe_verifier::VERIFIER_ADDRESS, cert_validity::CertValidity};
+use canoe_provider::{CanoeInput, CanoeProvider};
+use hokulea_proof::canoe_verifier::VERIFIER_ADDRESS;
 use sp1_cc_client_executor::ContractInput;
 use sp1_cc_host_executor::HostExecutor;
 use sp1_sdk::{ProverClient, SP1Stdin};
@@ -29,19 +29,15 @@ pub struct CanoeSp1CCProvider {
 impl CanoeProvider for CanoeSp1CCProvider {
     type Receipt = sp1_sdk::SP1ProofWithPublicValues;
 
-    async fn create_cert_validity_proof(
-        &self,
-        eigenda_cert: eigenda_v2_struct::EigenDAV2Cert,
-        cert_validity: CertValidity,
-    ) -> Result<Self::Receipt> {
+    async fn create_cert_validity_proof(&self, canoe_input: CanoeInput) -> Result<Self::Receipt> {
         info!(
             "begin to generate a sp1-cc proof invoked at l1 bn {}",
-            cert_validity.l1_head_block_number
+            canoe_input.l1_head_block_number
         );
         let start = Instant::now();
 
         // Which block transactions are executed on.
-        let block_number = BlockNumberOrTag::Number(cert_validity.l1_head_block_number);
+        let block_number = BlockNumberOrTag::Number(canoe_input.l1_head_block_number);
 
         let rpc_url = Url::from_str(&self.eth_rpc_url).unwrap();
 
@@ -55,13 +51,20 @@ impl CanoeProvider for CanoeSp1CCProvider {
 
         // Make the call
         let call = IEigenDACertMockVerifier::verifyDACertV2ForZKProofCall {
-            batchHeader: eigenda_cert.batch_header_v2.to_sol(),
-            blobInclusionInfo: eigenda_cert.blob_inclusion_info.clone().to_sol(),
-            nonSignerStakesAndSignature: eigenda_cert.nonsigner_stake_and_signature.to_sol(),
-            signedQuorumNumbers: eigenda_cert.signed_quorum_numbers,
+            batchHeader: canoe_input.eigenda_cert.batch_header_v2.to_sol(),
+            blobInclusionInfo: canoe_input
+                .eigenda_cert
+                .blob_inclusion_info
+                .clone()
+                .to_sol(),
+            nonSignerStakesAndSignature: canoe_input
+                .eigenda_cert
+                .nonsigner_stake_and_signature
+                .to_sol(),
+            signedQuorumNumbers: canoe_input.eigenda_cert.signed_quorum_numbers,
         };
 
-        let _returns = host_executor
+        let returns_bytes = host_executor
             .execute(ContractInput::new_call(
                 VERIFIER_ADDRESS,
                 Address::default(),
@@ -69,6 +72,14 @@ impl CanoeProvider for CanoeSp1CCProvider {
             ))
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+        // empricially if the function reverts, the output is empty, the guest code abort when evm revert takes place
+        let returns =
+            Bool::abi_decode(&returns_bytes).expect("deserialize NonSignerStakesAndSignature");
+
+        if returns != canoe_input.claimed_validity {
+            panic!("in the host executor part, executor arrives to a different answer than the claimed answer. Something consistent in the view of eigenda-proxy and zkVM");
+        }
 
         // Now that we've executed all of the calls, get the `EVMStateSketch` from the host executor.
         let evm_state_sketch = host_executor
@@ -106,8 +117,8 @@ impl CanoeProvider for CanoeSp1CCProvider {
         let (pk, _vk) = client.setup(ELF);
         let proof = client.prove(&pk, &stdin).compressed().run().unwrap();
 
-        let journal =
-            Journal::abi_decode(proof.public_values.as_slice()).expect("deserialize journal");
+        let journal = <Journal as SolType>::abi_decode(proof.public_values.as_slice())
+            .expect("deserialize journal");
 
         info!(
             "sp1-cc commited: blockHash {:?} contractOutput {:?}",
