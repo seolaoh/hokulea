@@ -43,10 +43,13 @@ impl CanoeVerifier for CanoeSteelVerifier {
         assert!(journal.blockhash == cert_validity.l1_head_block_hash);
 
         // ensure function being used is constrained
-        assert!(journal.contractAddress == VERIFIER_ADDRESS);
+        assert!(journal.certVerifierAddress == VERIFIER_ADDRESS);
 
         // ensure output is constrained
         assert!(journal.output == cert_validity.claimed_validity);
+
+        // ensure evm rule is constrained
+        assert!(journal.l1ChainId == cert_validity.l1_chain_id);
 
         // ensure inputs are constrained
         let mut buffer = Vec::new();

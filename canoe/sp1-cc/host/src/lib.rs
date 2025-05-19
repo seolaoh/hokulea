@@ -8,7 +8,7 @@ use canoe_bindings::{IEigenDACertMockVerifier, Journal};
 use canoe_provider::{CanoeInput, CanoeProvider};
 use hokulea_proof::canoe_verifier::VERIFIER_ADDRESS;
 use sp1_cc_client_executor::ContractInput;
-use sp1_cc_host_executor::HostExecutor;
+use sp1_cc_host_executor::{Genesis, HostExecutor};
 use sp1_sdk::{ProverClient, SP1Stdin};
 use std::str::FromStr;
 use std::time::Instant;
@@ -42,10 +42,17 @@ impl CanoeProvider for CanoeSp1CCProvider {
         let rpc_url = Url::from_str(&self.eth_rpc_url).unwrap();
 
         let provider = RootProvider::new_http(rpc_url);
-        let mut host_executor = HostExecutor::new(provider.clone(), block_number)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
+        let host_executor = match Genesis::try_from(canoe_input.l1_chain_id) {
+            Ok(genesis) => HostExecutor::new_with_genesis(provider.clone(), block_number, genesis)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.to_string()))?,
+            // if genesis is not available in the sp1-cc library, the code uses the default Genesis, which currently in
+            // sp1-cc is the mainnet. Ideally, Sp1-cc should make it easier to use the custom id genesis.
+            Err(_) => HostExecutor::new(provider.clone(), block_number)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.to_string()))?,
+        };
         // Keep track of the block hash. Later, validate the client's execution against this.
         // let block_hash = host_executor.header.hash_slow();
 
@@ -74,8 +81,7 @@ impl CanoeProvider for CanoeSp1CCProvider {
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
         // empricially if the function reverts, the output is empty, the guest code abort when evm revert takes place
-        let returns =
-            Bool::abi_decode(&returns_bytes).expect("deserialize NonSignerStakesAndSignature");
+        let returns = Bool::abi_decode(&returns_bytes).expect("deserialize returns_bytes");
 
         if returns != canoe_input.claimed_validity {
             panic!("in the host executor part, executor arrives to a different answer than the claimed answer. Something consistent in the view of eigenda-proxy and zkVM");
@@ -121,8 +127,8 @@ impl CanoeProvider for CanoeSp1CCProvider {
             .expect("deserialize journal");
 
         info!(
-            "sp1-cc commited: blockHash {:?} contractOutput {:?}",
-            journal.blockhash, journal.output
+            "sp1-cc commited: blockHash {:?} contractOutput {:?}, chainID {:?}",
+            journal.blockhash, journal.output, journal.l1ChainId,
         );
 
         let elapsed = start.elapsed();

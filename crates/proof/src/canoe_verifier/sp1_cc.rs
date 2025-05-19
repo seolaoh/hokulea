@@ -26,6 +26,8 @@ impl CanoeVerifier for CanoeSp1CCVerifier {
         // if not in dev mode, the receipt must be non empty
         let receipt_bytes = cert_validity.canoe_proof.as_ref();
 
+        let mut cert_validity = cert_validity.clone();
+
         // Because we have the sp1-cc dependancy issue, we cannot deserialize the bytes into SContractPublicValues
         // So instead we define custom struct Journal and compare opaque bytes array to ensure inputs are identical
         let canoe_receipt: SP1ProofWithPublicValues =
@@ -47,6 +49,11 @@ impl CanoeVerifier for CanoeSp1CCVerifier {
                 let client = ProverClient::from_env();
                 let (_, vk) = client.setup(ELF);
                 client.verify(&canoe_receipt, &vk).expect("verification failed");
+
+                // sp1-cc currently has limitation on supporting custom chain_id without supplying genesis json
+                // overwriting cert_validity chain_id to be 1, which is the default mainnet chain_id used by
+                // sp1-cc host when chain spec is not specified
+                cert_validity.l1_chain_id = 1;
             }
         }
 
@@ -68,10 +75,11 @@ impl CanoeVerifier for CanoeSp1CCVerifier {
         buffer.extend(signed_quorum_numbers_abi);
 
         let journal = Journal {
-            contractAddress: VERIFIER_ADDRESS,
+            certVerifierAddress: VERIFIER_ADDRESS,
             input: buffer.into(),
             blockhash: cert_validity.l1_head_block_hash,
             output: cert_validity.claimed_validity,
+            l1ChainId: cert_validity.l1_chain_id,
         };
         let journal_bytes = journal.abi_encode();
         assert!(journal_bytes == public_values_vec);

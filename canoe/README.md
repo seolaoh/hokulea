@@ -72,24 +72,35 @@ For `N` DA certs, protocols can aggregate them together into a single aggregated
 In rollups that rely on EigenDA, Hokulea is embedded in the derivation pipeline to enable secure OP integration. The Hokulea client itself is compiled into a ELF binary that runs inside the zkVM. After this EFL binary executes, the zkVM outputs a validity proof attesting to the Hokulea client’s run.
 While executing, the client validates each canoe certificate by:
 
-Accepting a proof P for every EigenDA certificate encountered.
+Expecting a proof P for every EigenDA certificate encountered.
 
-Re‑creating (f, s, C, O, I) locally, where s commits to state S.
+Verifying and aborting if P fails; otherwise, continuing the derivation process.
 
-Aborting if P fails; otherwise, continuing the derivation process.
+Re‑creating (f, s, C, O, I) locally, where s commits to state S. And Check whether it is the same journal commited by the zkVM.
 
-These steps ensure that any invalid certificates are discarded.
+These steps ensure that any invalid certificates are discarded, and a malicious host cannot fool client to accept invalid cert.
 
 ![](../assets/usecase3.png)
 
+## 5 · Securely Verify Canoe Proof
 
-## 5 · Remark
+Canoe defines a standard output interface called `Journal` that encapsulates the five parameters for the model above. See solidity type under [binding](../canoe/bindings/src/lib.rs). 
+The guest implementation within a zkVM must commit those five variable as the public output. 
+This creates a mapping from (f, S, C, I) to O, and the value of the zkVM proof is to attest that such mapping is indeed correct.
+It is crucial that given (f, S, C, I), there is only one answer. This is achieved by having a determinstic relation from (f, S, C, I) to O.  
+To prevent a host from fabicating a proof attesting some random logic, 
+the verifiation logic must independently construct the (f, S, C, I) part of the journal using the trusted data source and compare it against the journal committed by the zkVM, on top of verifying the validity proof produced by Canoe provider. certVerifierAddress is either built into binary or committed onchain L1,
+input is the DA certificate, l1ChainId can be found from the bootInfo, the state is anchored by the l1_head used during the challenge process
+In Hokulea, such verification takes place in [canoe_verifier](../crates/proof/src/canoe_verifier/).
+
+
+## 6 · Remark
 
 The Chain Specification defines the rules of the EVM, which underpin the execution semantics of smart contracts. As such, any Ethereum hardfork that introduces changes to EVM behavior necessitates corresponding updates across the proof stack. Specifically, both RISC Zero Steel and SP1 Contract Call backends must be upgraded to align with the new EVM logic. To remain compatible, Hokulea must also integrate an updated version of the zkVM backend that reflects these changes.
 
 Before an Ethereum hardfork is activated, the zkVM backend must audit, prepare, and release an upgraded version to ensure compatibility. Importantly, the universal zkVM verifier deployed on L1 does not require an upgrade with each EVM change, since previously generated contract logic remains valid and backward-compatible across EVM upgrades.
 
-## Canoe and Hokulea Upgrade
+## 7 · Canoe and Hokulea Upgrade
 
 Canoe depends on the zkVM back‑end libraries, so every library upgrade forces a rebuild of its execution artifacts most notably the ELF image of canoe guest(or client in SP1) program. In the Hokulea workflow, the guest program’s fingerprint (an image ID after compilation by Steel, or a verification key by SP1‑Contract‑Call) is hard‑coded into the Hokulea and produces a new ELF. It is used by the zkVM to verify the Canoe proof, meaning any new Hokulea ELF must also be registered on Ethereum L1: deploy the new image ID of Hokulea program that contains the new canoe guest fingerprint.
 
