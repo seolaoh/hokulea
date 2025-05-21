@@ -16,5 +16,7 @@ pub trait CanoeVerifier: Clone + Send + 'static {
     }
 }
 
-// changed in each contarct deployment
-pub const VERIFIER_ADDRESS: Address = address!("0x17435ccE3d1B4fA2e5f8A08eD921D57C6762A180");
+// This is the cert verifier that canoe provider and verifier are run against.
+// In hokulea repo, there is a mock contract under canoe directory, which can be
+// deployed to generate the address and test functionality.
+pub const VERIFIER_ADDRESS: Address = address!("0xb4B46bdAA835F8E4b4d8e208B6559cD267851051");
