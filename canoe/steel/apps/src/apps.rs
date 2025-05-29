@@ -37,6 +37,7 @@ pub struct CanoeSteelProvider {
 
 #[async_trait]
 impl CanoeProvider for CanoeSteelProvider {
+    /// The receipt can be used for both mock proof and verification within zkVM
     type Receipt = risc0_zkvm::Receipt;
 
     async fn create_cert_validity_proof(&self, canoe_input: CanoeInput) -> Result<Self::Receipt> {
