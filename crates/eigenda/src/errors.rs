@@ -69,3 +69,32 @@ pub enum BlobDecodingError {
     #[error("invalid content size")]
     InvalidContentSize,
 }
+
+/// A list of Hokulea error derived from data from preimage oracle
+/// This error is intended for application logics, and it is separate from
+/// the more basic error type that deals with HokuleaOracleProviderError
+/// which hanldes communicates, response format error
+#[derive(Debug, thiserror::Error, PartialEq)]
+#[error(transparent)]
+pub enum HokuleaPreimageError {
+    /// EigenDA cert is invalid
+    #[error("da cert is invalid")]
+    InvalidCert,
+    /// EigenDA cert is not recent
+    #[error("da cert is not recent enough")]
+    NotRecentCert,
+}
+
+/// define conversion error
+impl From<HokuleaPreimageError> for HokuleaErrorKind {
+    fn from(e: HokuleaPreimageError) -> Self {
+        match e {
+            HokuleaPreimageError::InvalidCert => {
+                HokuleaErrorKind::Discard("da cert is invalid".to_string())
+            }
+            HokuleaPreimageError::NotRecentCert => {
+                HokuleaErrorKind::Discard("da cert is not recent enough".to_string())
+            }
+        }
+    }
+}

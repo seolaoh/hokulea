@@ -3,9 +3,12 @@ use alloy_primitives::keccak256;
 use crate::cfg::SingleChainHostWithEigenDA;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use hokulea_eigenda::EigenDABlobData;
-use hokulea_eigenda::{AltDACommitment, EigenDAVersionedCert};
-use hokulea_eigenda::{BYTES_PER_FIELD_ELEMENT, PAYLOAD_ENCODING_VERSION_0};
+use hokulea_eigenda::AltDACommitment;
+use hokulea_eigenda::{EigenDABlobData, RESERVED_EIGENDA_API_BYTE_FOR_RECENCY};
+use hokulea_eigenda::{
+    BYTES_PER_FIELD_ELEMENT, PAYLOAD_ENCODING_VERSION_0, RESERVED_EIGENDA_API_BYTE_FOR_VALIDITY,
+    RESERVED_EIGENDA_API_BYTE_INDEX,
+};
 use hokulea_proof::hint::ExtendedHintType;
 use kona_host::SharedKeyValueStore;
 use kona_host::{single::SingleChainHintHandler, HintHandler, OnlineHostBackendCfg};
@@ -55,7 +58,7 @@ impl HintHandler for SingleChainHintHandlerWithEigenDA {
 pub async fn fetch_eigenda_hint(
     hint: Hint<<SingleChainHostWithEigenDA as OnlineHostBackendCfg>::HintType>,
     // for eigenda specific config data, currently unused
-    _cfg: &SingleChainHostWithEigenDA,
+    cfg: &SingleChainHostWithEigenDA,
     providers: &<SingleChainHostWithEigenDA as OnlineHostBackendCfg>::Providers,
     kv: SharedKeyValueStore,
 ) -> Result<()> {
@@ -79,10 +82,6 @@ pub async fn fetch_eigenda_hint(
     }
     let rollup_data = response.bytes().await.unwrap();
 
-    // TODO define an error message from proxy that if the view call is wrong
-    // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDACertVerifier.sol#L165
-    // then store empty byte in the kv_store
-
     // given the client sent the hint, the cert itself must have been deserialized and serialized,
     // so format of cert must be valid and the following try_into must not panic
     let altda_commitment: AltDACommitment = match altda_commitment_bytes.as_ref().try_into() {
@@ -92,37 +91,55 @@ pub async fn fetch_eigenda_hint(
         }
     };
 
-    let mut field_element_key = altda_commitment.digest_template();
-
-    let blob_length_fe = match &altda_commitment.versioned_cert {
-        EigenDAVersionedCert::V1(_) => panic!("hokulea does not support eigenda v1"),
-        EigenDAVersionedCert::V2(c) => {
-            c.blob_inclusion_info
-                .blob_certificate
-                .blob_header
-                .commitment
-                .length as usize
-        }
-    };
-
-    let eigenda_blob = EigenDABlobData::encode(rollup_data.as_ref(), PAYLOAD_ENCODING_VERSION_0);
     // Acquire a lock on the key-value store and set the preimages.
     let mut kv_write_lock = kv.write().await;
+
+    // pre-populate recency window size. Currently, it is set to sequencing window size
+    let rollup_config = cfg
+        .kona_cfg
+        .read_rollup_config()
+        .expect("should have been able to read rollup config");
+    // ToDo (bx) fix the hack at eigenda-proxy. For now + 100_000_000 to avoid recency failure
+    // currently, proxy only returns a rbn < 32
+    let recency = rollup_config.seq_window_size + 100_000_000;
+    let recency_be_bytes = recency.to_be_bytes();
+    let mut recency_address = altda_commitment.digest_template();
+    recency_address[RESERVED_EIGENDA_API_BYTE_INDEX] = RESERVED_EIGENDA_API_BYTE_FOR_RECENCY;
+
+    kv_write_lock.set(
+        PreimageKey::new(*keccak256(recency_address), PreimageKeyType::GlobalGeneric).into(),
+        recency_be_bytes.to_vec(),
+    )?;
+
+    // pre-populate validity address. Currently, assume everything is correct
+    // (ToDo bx), after proxy returns error code indicating cert is wrong, route
+    // with appropriate response false
+    let claimed_validity = true;
+    let mut validity_address = altda_commitment.digest_template();
+
+    validity_address[RESERVED_EIGENDA_API_BYTE_INDEX] = RESERVED_EIGENDA_API_BYTE_FOR_VALIDITY;
+
+    kv_write_lock.set(
+        PreimageKey::new(*keccak256(validity_address), PreimageKeyType::GlobalGeneric).into(),
+        vec![claimed_validity as u8],
+    )?;
+
+    // pre-populate eigenda blob field element by field element
+    let blob_length_fe = altda_commitment.get_num_field_element();
+
+    let eigenda_blob = EigenDABlobData::encode(rollup_data.as_ref(), PAYLOAD_ENCODING_VERSION_0);
 
     // implementation requires eigenda_blob to be multiple of 32
     assert!(eigenda_blob.blob.len() % 32 == 0);
     let fetch_num_element = (eigenda_blob.blob.len() / BYTES_PER_FIELD_ELEMENT) as u64;
 
+    let mut field_element_key = altda_commitment.digest_template();
     // populate every field element (fe) onto database
     for i in 0..blob_length_fe as u64 {
         field_element_key[72..].copy_from_slice(i.to_be_bytes().as_ref());
 
         let blob_key_hash = keccak256(field_element_key.as_ref());
 
-        kv_write_lock.set(
-            PreimageKey::new(*blob_key_hash, PreimageKeyType::Keccak256).into(),
-            field_element_key.into(),
-        )?;
         if i < fetch_num_element {
             kv_write_lock.set(
                 PreimageKey::new(*blob_key_hash, PreimageKeyType::GlobalGeneric).into(),

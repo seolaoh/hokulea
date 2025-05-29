@@ -4134,6 +4134,7 @@ dependencies = [
  "hokulea-eigenda",
  "hokulea-proof",
  "rust-kzg-bn254-primitives",
+ "tracing",
 ]
 
 [[package]]
