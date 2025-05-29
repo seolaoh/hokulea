@@ -242,7 +242,7 @@ save-chain-env env_file rollup_config_path='rollup.json' enclave='eigenda-devnet
   L1_BEACON_RPC="$(kurtosis port print {{enclave}} cl-1-teku-geth http)"
   L2_RPC="$(kurtosis port print {{enclave}} op-el-{{chain_id}}-1-op-geth-op-node-op-kurtosis rpc)"
   ROLLUP_NODE_RPC="$(kurtosis port print {{enclave}} op-cl-{{chain_id}}-1-op-node-op-geth-op-kurtosis http)"
-  EIGENDA_PROXY_RPC="$(kurtosis port print {{enclave}} da-server-op-kurtosis http)"
+  EIGENDA_PROXY_RPC="$(kurtosis port print {{enclave}} op-da-da-server-{{chain_id}}-op-kurtosis http)"
   ROLLUP_CONFIG_PATH="$(realpath {{rollup_config_path}})"    
 
   echo "L1_RPC=$L1_RPC" > {{env_file}}
