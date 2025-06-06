@@ -203,4 +203,10 @@ impl EigenDAV2Cert {
         self.encode(&mut cert_rlp_bytes);
         keccak256(&cert_rlp_bytes)
     }
+
+    pub fn from_bytes(data: &[u8]) -> Self {
+        let mut slice = data;
+        EigenDAV2Cert::decode(&mut slice)
+            .expect("should be able to convert to EigenDAV2Cert struct")
+    }
 }
