@@ -4,7 +4,7 @@ use alloy_primitives::{FixedBytes, U256};
 use ark_bn254::{Fq, G1Affine};
 use ark_ff::PrimeField;
 use async_trait::async_trait;
-use eigenda_v2_struct::EigenDAV2Cert;
+use eigenda_cert::EigenDACertV2;
 use hokulea_eigenda::{AltDACommitment, EigenDABlobProvider, EigenDAVersionedCert};
 use rust_kzg_bn254_primitives::blob::Blob;
 use rust_kzg_bn254_verifier::batch;
@@ -35,13 +35,13 @@ use crate::canoe_verifier::CanoeVerifier;
 #[derive(Clone, Debug, Default)]
 pub struct PreloadedEigenDABlobProvider {
     /// The tuple contains a mapping from DAcert to recency window size
-    /// Although currently, rececny window does not change across EigenDAV2Cert
-    /// But to be future compatible, we anchor recency window size by rbn from EigenDAV2Cert
-    pub recency_entries: Vec<(EigenDAV2Cert, u64)>,
+    /// Although currently, recency window does not change across EigenDACertV2
+    /// But to be future compatible, we anchor recency window size by rbn from EigenDACertV2
+    pub recency_entries: Vec<(EigenDACertV2, u64)>,
     /// The tuple contains a mapping from DAcert to cert validity
-    pub validity_entries: Vec<(EigenDAV2Cert, bool)>,
+    pub validity_entries: Vec<(EigenDACertV2, bool)>,
     /// The tuple contains a mapping from DAcert to Eigenda blob
-    pub blob_entries: Vec<(EigenDAV2Cert, Blob)>,
+    pub blob_entries: Vec<(EigenDACertV2, Blob)>,
 }
 
 impl PreloadedEigenDABlobProvider {
@@ -125,16 +125,16 @@ impl EigenDABlobProvider for PreloadedEigenDABlobProvider {
     ) -> Result<u64, Self::Error> {
         let (eigenda_cert, recency) = self.recency_entries.pop().unwrap();
         match &altda_commitment.versioned_cert {
-            EigenDAVersionedCert::V1(_c) => panic!("hokulea does not support eigenda v1. This should have been filtered out at the start of derivation, please report bug"),
             EigenDAVersionedCert::V2(c) => {
                 if c == &eigenda_cert {
                     Ok(recency)
                 } else {
                     // It is safe to abort here, because zkVM is not given the correct preimage to start with, stop early
-                    error!("requested cert is {:?}, stored cert is {:?}", c.digest(), eigenda_cert.digest());
+                    error!("requested cert is {:?}, stored cert is {:?}", c.to_digest(), eigenda_cert.to_digest());
                     panic!("preloaded eigenda blob provider does not match cert requested from derivation pipeline. EigenDABlobWitnessData is misconfigured. This is a bug")
                 }
             }
+            _ => panic!("hokulea currently only supports v2 cert. This should have been filtered out at the start of derivation, please report bug"),
         }
     }
 
@@ -145,18 +145,16 @@ impl EigenDABlobProvider for PreloadedEigenDABlobProvider {
         let (eigenda_cert, validity) = self.validity_entries.pop().unwrap();
 
         match &altda_commitment.versioned_cert {
-            // ToDo (bx), there should have a better to panic V1 cert without having to have boilerplate code
-            // maybe we should just remove V1 cert
-            EigenDAVersionedCert::V1(_c) => panic!("hokulea does not support eigenda v1. This should have been filtered out at the start of derivation, please report bug"),
             EigenDAVersionedCert::V2(c) => {
                 if c == &eigenda_cert {
                     Ok(validity)
                 } else {
                     // It is safe to abort here, because zkVM is not given the correct preimage to start with, stop early
-                    error!("requested cert is {:?}, stored cert is {:?}", c.digest(), eigenda_cert.digest());
+                    error!("requested cert is {:?}, stored cert is {:?}", c.to_digest(), eigenda_cert.to_digest());
                     panic!("preloaded eigenda blob provider does not match cert requested from derivation pipeline. EigenDABlobWitnessData is misconfigured. This is a bug")
                 }
             }
+            _ => panic!("hokulea currently only supports v2 cert. This should have been filtered out at the start of derivation, please report bug"),
         }
     }
 
@@ -165,17 +163,16 @@ impl EigenDABlobProvider for PreloadedEigenDABlobProvider {
     async fn get_blob(&mut self, altda_commitment: &AltDACommitment) -> Result<Blob, Self::Error> {
         let (eigenda_cert, eigenda_blob) = self.blob_entries.pop().unwrap();
         match &altda_commitment.versioned_cert {
-            // secure integration is not implemented for v1, but feel free to contribute
-            EigenDAVersionedCert::V1(_c) => panic!("hokulea does not support eigenda v1. This should have been filtered out at the start of derivation, please report bug"),
             EigenDAVersionedCert::V2(c) => {
                 if c == &eigenda_cert {
                     Ok(eigenda_blob)
                 } else {
                     // It is safe to abort here, because zkVM is not given the correct preimage to start with, stop early
-                    error!("requested cert is {:?}, stored cert is {:?}", c.digest(), eigenda_cert.digest());
+                    error!("requested cert is {:?}, stored cert is {:?}", c.to_digest(), eigenda_cert.to_digest());
                     panic!("preloaded eigenda blob provider does not match cert requested from derivation pipeline. EigenDABlobWitnessData is misconfigured. This is a bug")
                 }
             }
+            _ => panic!("hokulea currently only supports v2 cert. This should have been filtered out at the start of derivation, please report bug"),
         }
     }
 }

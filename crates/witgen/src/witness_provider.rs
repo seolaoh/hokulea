@@ -1,6 +1,6 @@
 use alloy_primitives::{FixedBytes, B256};
 use async_trait::async_trait;
-use eigenda_v2_struct::EigenDAV2Cert;
+use eigenda_cert::EigenDACertV2;
 use hokulea_compute_proof::compute_kzg_proof;
 use hokulea_eigenda::{AltDACommitment, EigenDABlobProvider, EigenDAVersionedCert};
 use hokulea_proof::cert_validity::CertValidity;
@@ -105,16 +105,16 @@ impl<T: EigenDABlobProvider + Send> EigenDABlobProvider for OracleEigenDAWitness
 /// helper function, to be removed after changed EigenDABlobWitnessData to take AltDACommitment
 /// in its fields
 impl<T: EigenDABlobProvider + Send> OracleEigenDAWitnessProvider<T> {
-    pub fn get_cert(&self, altda_commitment: &AltDACommitment) -> EigenDAV2Cert {
+    pub fn get_cert(&self, altda_commitment: &AltDACommitment) -> EigenDACertV2 {
         // V1 is not supported for secure integration, feel free to contribute
         let cert = match &altda_commitment.versioned_cert {
-            EigenDAVersionedCert::V1(_) => panic!("secure v1 integration is not supported"),
             EigenDAVersionedCert::V2(c) => c,
+            _ => panic!("only v2 is supported"),
         };
         debug!(
             target = "OracleEigenDAWitnessProvider",
             "pusehd a cert {}",
-            cert.digest()
+            cert.to_digest()
         );
         cert.clone()
     }

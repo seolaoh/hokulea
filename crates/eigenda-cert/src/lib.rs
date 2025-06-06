@@ -1,12 +1,17 @@
 #![no_std]
 use alloy_primitives::Bytes;
-use alloy_primitives::{keccak256, FixedBytes, B256, U256};
-use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
+use alloy_primitives::{FixedBytes, U256};
+use alloy_rlp::{Decodable, RlpDecodable, RlpEncodable};
 use canoe_bindings as sol_struct;
 use serde::{Deserialize, Serialize};
 
 extern crate alloc;
 use alloc::vec::Vec;
+
+pub mod v2_cert;
+pub mod v3_cert;
+pub use v2_cert::EigenDACertV2;
+pub use v3_cert::EigenDACertV3;
 
 // G1Point represents a point on the BN254 G1 curve
 #[derive(Debug, Clone, Copy, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
@@ -67,6 +72,8 @@ impl BlobCommitment {
 }
 
 // BlobHeaderV2 is the version 2 of blob header
+// This version is separate from the cert Version. For example, Cert V3 can use BlobHeaderV2
+// since V2 is a tag for EigenDA protocol
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct BlobHeaderV2 {
     pub version: u16,
@@ -104,7 +111,7 @@ impl BlobCertificate {
     }
 }
 
-// BlobInclusionInfo contains inclusion proof information for a blob
+/// BlobInclusionInfo contains inclusion proof information for a blob
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct BlobInclusionInfo {
     pub blob_certificate: BlobCertificate,
@@ -112,13 +119,17 @@ pub struct BlobInclusionInfo {
     pub inclusion_proof: Bytes,
 }
 
-// BatchHeaderV2 is the version 2 of batch header
+/// BatchHeaderV2 is the version 2 of batch header which is defined by the EigenDA protocol
+/// This version is separate from the cert Version. For example, Cert V3 can use BatchHeaderV2
+/// since V2 is a tag for EigenDA protocol. The V2 is added to the suffix of the name for
+/// matching the same variable name for its solidity part.
+/// <https://github.com/Layr-Labs/eigenda/blob/510291b9be38cacbed8bc62125f6f9a14bd604e4/contracts/src/core/libraries/v2/EigenDATypesV2.sol#L47>
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct BatchHeaderV2 {
     pub batch_root: [u8; 32],
     pub reference_block_number: u32,
 }
-// NonSignerStakesAndSignature contains information about non-signers and their stakes
+/// NonSignerStakesAndSignature contains information about non-signers and their stakes
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct NonSignerStakesAndSignature {
     pub non_signer_quorum_bitmap_indices: Vec<u32>,
@@ -131,6 +142,9 @@ pub struct NonSignerStakesAndSignature {
     pub non_signer_stake_indices: Vec<Vec<u32>>,
 }
 
+/// The V2 is added to the suffix of the name for matching the same variable name
+/// for its solidity part.
+/// <https://github.com/Layr-Labs/eigenda/blob/510291b9be38cacbed8bc62125f6f9a14bd604e4/contracts/src/core/libraries/v2/EigenDATypesV2.sol#L28>
 impl BatchHeaderV2 {
     pub fn to_sol(&self) -> sol_struct::BatchHeaderV2 {
         sol_struct::BatchHeaderV2 {
@@ -185,28 +199,4 @@ pub fn parse_blob_inclusion(data: &Vec<u8>) -> sol_struct::BlobInclusionInfo {
     BlobInclusionInfo::decode(&mut data.as_slice())
         .expect("decode to rust blob inclusion struct")
         .to_sol()
-}
-
-/// EigenDAV2Cert to be updatd in the solidity
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
-pub struct EigenDAV2Cert {
-    pub blob_inclusion_info: BlobInclusionInfo,
-    pub batch_header_v2: BatchHeaderV2,
-    pub nonsigner_stake_and_signature: NonSignerStakesAndSignature,
-    pub signed_quorum_numbers: Bytes,
-}
-
-impl EigenDAV2Cert {
-    pub fn digest(&self) -> B256 {
-        let mut cert_rlp_bytes = Vec::<u8>::new();
-        // rlp encode of cert
-        self.encode(&mut cert_rlp_bytes);
-        keccak256(&cert_rlp_bytes)
-    }
-
-    pub fn from_bytes(data: &[u8]) -> Self {
-        let mut slice = data;
-        EigenDAV2Cert::decode(&mut slice)
-            .expect("should be able to convert to EigenDAV2Cert struct")
-    }
 }
