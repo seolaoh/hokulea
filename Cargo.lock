@@ -2310,6 +2310,7 @@ dependencies = [
  "canoe-bindings",
  "eigenda-cert",
  "serde",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -2339,7 +2340,6 @@ dependencies = [
  "canoe-bindings",
  "canoe-provider",
  "eigenda-cert",
- "hokulea-proof",
  "sp1-build",
  "sp1-cc-client-executor",
  "sp1-cc-host-executor",
@@ -2359,7 +2359,6 @@ dependencies = [
  "canoe-bindings",
  "canoe-provider",
  "canoe-steel-methods",
- "hokulea-proof",
  "risc0-steel",
  "risc0-zkvm",
  "tokio",

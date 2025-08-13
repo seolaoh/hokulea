@@ -1,4 +1,4 @@
-use alloy_primitives::B256;
+use alloy_primitives::{Address, B256};
 use alloy_sol_types::SolValue;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -6,6 +6,8 @@ use canoe_bindings::{IEigenDACertVerifier, IEigenDACertVerifierBase};
 use eigenda_cert::{AltDACommitment, EigenDAVersionedCert};
 use serde::{Deserialize, Serialize};
 
+/// CanoeInput contains all the necessary data to create a ZK proof
+/// attesting the validity of a cert within an altda commitment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanoeInput {
     /// altda commitment
@@ -21,14 +23,28 @@ pub struct CanoeInput {
     pub l1_head_block_number: u64,
     /// l1 chain id specifies the chain which implicitly along with l1_head_block_number indicates the current EVM version due to hardfork
     pub l1_chain_id: u64,
+    /// cert verifier or router verifier address used for verifying the altda commitment
+    /// verifier_address must not be manipulated by the zkvm host. It can be set either with a single router address or a set of
+    /// fixed cert verifier address
+    pub verifier_address: Address,
 }
 
 #[async_trait]
 pub trait CanoeProvider: Clone + Send + 'static {
     type Receipt: Serialize + for<'de> Deserialize<'de>;
 
-    async fn create_cert_validity_proof(&self, input: CanoeInput) -> Result<Self::Receipt>;
+    /// create_certs_validity_proof takes a vector of canoe inputs and produces one zk proof attesting
+    /// all the claimed validity in vector are indeed correct result.
+    /// The correctness is defined by evaluating result of applying the DAcert on the specified chain
+    /// at a certain block number on the verifier address.
+    /// The function assumes at least one CanoeInput, and all canoe inputs must share common
+    /// (l1_chain_id, l1_head_block_number)
+    async fn create_certs_validity_proof(
+        &self,
+        _canoe_inputs: Vec<CanoeInput>,
+    ) -> Result<Self::Receipt>;
 
+    /// get_eth_rpc_url returns eth rpc for fetching the state in order to generate the zk validity proof for DACert
     fn get_eth_rpc_url(&self) -> String;
 }
 
@@ -39,13 +55,25 @@ pub struct CanoeNoOpProvider {}
 impl CanoeProvider for CanoeNoOpProvider {
     type Receipt = ();
 
-    async fn create_cert_validity_proof(&self, _canoe_input: CanoeInput) -> Result<Self::Receipt> {
+    async fn create_certs_validity_proof(
+        &self,
+        _canoe_inputs: Vec<CanoeInput>,
+    ) -> Result<Self::Receipt> {
         Ok(())
     }
 
     fn get_eth_rpc_url(&self) -> String {
         "".to_string()
     }
+}
+
+/// CanoeProviderError allows the caller to handle error types.
+/// EmptyCanoeInput happens when there is no canoe to be proven.
+#[derive(Debug, thiserror::Error)]
+pub enum CanoeProviderError {
+    /// Empty Canoe Input
+    #[error("Empty Canoe Input")]
+    EmptyCanoeInput,
 }
 
 /// Call respecting solidity interface

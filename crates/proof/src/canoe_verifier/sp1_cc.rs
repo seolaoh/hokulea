@@ -1,6 +1,7 @@
 use crate::canoe_verifier::errors::HokuleaCanoeVerificationError;
 use crate::canoe_verifier::CanoeVerifier;
 use crate::cert_validity::CertValidity;
+use alloc::vec::Vec;
 use alloy_primitives::B256;
 use eigenda_cert::AltDACommitment;
 
@@ -9,7 +10,7 @@ use tracing::{info, warn};
 // ToDo(bx) how to automtically update it from ELF directly as oppose to hard code it
 // To get vKey of ELF
 // cargo prove vkey --elf target/elf-compilation/riscv32im-succinct-zkvm-elf/release/canoe-sp1-cc-client
-pub const VKEYHEXSTRING: &str = "000c14f7db37c67a3385e24e60016e160634d73fb9b01f69073a46f259b5f302";
+pub const VKEYHEXSTRING: &str = "00692d1aac07e614ced12f4b16f50834490e735b89d2d3492b343337bb31d227";
 
 #[derive(Clone)]
 pub struct CanoeSp1CCVerifier {}
@@ -20,8 +21,8 @@ impl CanoeVerifier for CanoeSp1CCVerifier {
     #[allow(unused_variables)]
     fn validate_cert_receipt(
         &self,
-        cert_validity: CertValidity,
-        altda_commitment: AltDACommitment,
+        cert_validity_pair: Vec<(AltDACommitment, CertValidity)>,
+        canoe_proof_bytes: Option<Vec<u8>>,
     ) -> Result<(), HokuleaCanoeVerificationError> {
         info!("using CanoeSp1CCVerifier");
 
@@ -30,17 +31,17 @@ impl CanoeVerifier for CanoeSp1CCVerifier {
                 use sha2::{Digest, Sha256};
                 use sp1_lib::verify::verify_sp1_proof;
                 use core::str::FromStr;
-                use crate::canoe_verifier::to_journal_bytes;
+                use crate::canoe_verifier::to_journals_bytes;
 
-                let journal_bytes = to_journal_bytes(&cert_validity, &altda_commitment);
+                let journals_bytes = to_journals_bytes(cert_validity_pair);
 
                 // if not in dev mode, the receipt should be empty
-                if cert_validity.canoe_proof.is_some() {
+                if canoe_proof_bytes.is_some() {
                     // Sp1 doc https://github.com/succinctlabs/sp1/blob/a1d873f10c32f5065de120d555cfb53de4003da3/examples/aggregation/script/src/main.rs#L75
                     warn!("sp1-cc verification within zkvm requires proof being provided via zkVM stdin");
                 }
                 // used within zkVM
-                let public_values_digest = Sha256::digest(journal_bytes);
+                let public_values_digest = Sha256::digest(journals_bytes);
                 let v_key_b256 = B256::from_str(VKEYHEXSTRING).map_err(|_| HokuleaCanoeVerificationError::InvalidVerificationKeyForSp1)?;
                 let v_key = b256_to_u32_array(v_key_b256);
                 // the function will panic if the proof is incorrect
