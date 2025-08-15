@@ -59,9 +59,17 @@ async fn main() -> anyhow::Result<()> {
             // This is not included as a part of example, because the example does use SP1 zkVM to verify proof.
             // Particularly, op-succinct integration needs to use write_proof() to supply compressed proof
             // into SP1 zkvm when using hokulea as an ELF.
-            use canoe_sp1_cc_host::CanoeSp1CCProvider;
+            use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
             use hokulea_proof::canoe_verifier::sp1_cc::CanoeSp1CCVerifier;
-            let canoe_provider = CanoeSp1CCProvider{
+            use sp1_sdk::{ProverClient, HashableKey};
+
+            const CANOE_SP1CC_ELF: &[u8] = canoe_sp1_cc_host::ELF;
+            let client = ProverClient::from_env();
+            let (_pk, canoe_vk) = client.setup(CANOE_SP1CC_ELF);
+
+            println!("canoe sp1cc v_key {:?}", canoe_vk.vk.hash_u32() );
+
+            let canoe_provider = CanoeSp1CCReducedProofProvider{
                 eth_rpc_url: cfg.kona_cfg.l1_node_address.clone().unwrap(),
             };
             let canoe_verifier = CanoeSp1CCVerifier{};

@@ -11,12 +11,11 @@ use sp1_cc_host_executor::{EvmSketch, Genesis};
 use sp1_sdk::{ProverClient, SP1Proof, SP1Stdin};
 use std::str::FromStr;
 use std::time::Instant;
-use tracing::info;
+use tracing::{info, warn};
 use url::Url;
 
 /// The ELF we want to execute inside the zkVM.
 pub const ELF: &[u8] = include_bytes!("../../elf/canoe-sp1-cc-client");
-
 /// A canoe provider implementation with Sp1 contract call
 /// CanoeSp1CCProvider produces the receipt of type SP1ProofWithPublicValues,
 /// SP1ProofWithPublicValues contains a Stark proof which can be verified in
@@ -114,6 +113,7 @@ async fn get_sp1_cc_proof(
         // if genesis is not available in the sp1-cc library, the code uses the default Genesis, which currently in
         // sp1-cc is the mainnet. Ideally, Sp1-cc should make it easier to use a custom genesis config.
         Err(_) => {
+            warn!("Only use for testing environment");
             EvmSketch::builder()
                 .at_block(block_number)
                 .el_rpc_url(rpc_url)
@@ -134,7 +134,7 @@ async fn get_sp1_cc_proof(
         };
 
         let returns_bytes = sketch
-            .call(contract_input)
+            .call_raw(&contract_input)
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
