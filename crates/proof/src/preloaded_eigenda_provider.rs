@@ -63,10 +63,14 @@ impl PreloadedEigenDABlobProvider {
         // check all cert validity are substantiated by zk validity proof
         let mut validity_entries = vec![];
 
-        // check cert validity altogether in one verification
-        canoe_verifier
-            .validate_cert_receipt(value.validity.clone(), value.canoe_proof_bytes)
-            .expect("verification should have been passing");
+        // if the number of da cert is non-zero, verify the single canoe proof, regardless if the
+        // da cert is valid or not. Otherwise, skip the verification
+        if !value.validity.is_empty() {
+            // check cert validity altogether in one verification
+            canoe_verifier
+                .validate_cert_receipt(value.validity.clone(), value.canoe_proof_bytes)
+                .expect("verification should have been passing");
+        }
 
         for (altda_commitment, cert_validity) in &value.validity {
             // populate only the mapping <DAcert, boolean> for preimage trait
@@ -78,7 +82,8 @@ impl PreloadedEigenDABlobProvider {
         let mut blobs = vec![];
         let mut proofs = vec![];
         let mut commitments = vec![];
-        //for i in 0..value.eigenda_certs.len() {
+
+        // checking the blob is consistent to the kzg commitment from the da certs
         for (cert, eigenda_blobs, kzg_proof) in value.blob {
             let blob = Blob::new(&eigenda_blobs).expect("should be able to construct a blob");
             // if valid, check blob kzg integrity
@@ -89,7 +94,6 @@ impl PreloadedEigenDABlobProvider {
             // populate entries ahead of time, if something is invalid, batch_verify will abort
             blob_entries.push((cert.clone(), blob));
         }
-        // check if cert is not valie, the blob must be empty, assert that commitments in the cert and blobs are consistent
         assert!(batch_verify(blobs, commitments, proofs));
         // invariant check
         assert!(recency_entries.len() >= validity_entries.len());
