@@ -8,14 +8,24 @@ use canoe_provider::{CanoeInput, CanoeProvider, CanoeProviderError, CertVerifier
 use eigenda_cert::EigenDAVersionedCert;
 use sp1_cc_client_executor::ContractInput;
 use sp1_cc_host_executor::{EvmSketch, Genesis};
-use sp1_sdk::{ProverClient, SP1Proof, SP1Stdin};
-use std::str::FromStr;
-use std::time::Instant;
+use sp1_sdk::{
+    network::FulfillmentStrategy, Prover, ProverClient, SP1Proof, SP1ProofMode,
+    SP1ProofWithPublicValues, SP1Stdin, SP1_CIRCUIT_VERSION,
+};
+use std::{
+    env,
+    str::FromStr,
+    time::{Duration, Instant},
+};
 use tracing::{info, warn};
 use url::Url;
 
 /// The ELF we want to execute inside the zkVM.
 pub const ELF: &[u8] = include_bytes!("../../elf/canoe-sp1-cc-client");
+
+const DEFAULT_NETWORK_PRIVATE_KEY: &str =
+    "0x0000000000000000000000000000000000000000000000000000000000000001";
+
 /// A canoe provider implementation with Sp1 contract call
 /// CanoeSp1CCProvider produces the receipt of type SP1ProofWithPublicValues,
 /// SP1ProofWithPublicValues contains a Stark proof which can be verified in
@@ -25,6 +35,8 @@ pub const ELF: &[u8] = include_bytes!("../../elf/canoe-sp1-cc-client");
 pub struct CanoeSp1CCProvider {
     /// rpc to l1 geth node
     pub eth_rpc_url: String,
+    /// if true, execute and return a mock proof
+    pub mock_mode: bool,
 }
 
 #[async_trait]
@@ -35,7 +47,7 @@ impl CanoeProvider for CanoeSp1CCProvider {
         &self,
         canoe_inputs: Vec<CanoeInput>,
     ) -> Result<Self::Receipt> {
-        get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url).await
+        get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url, self.mock_mode).await
     }
 
     fn get_eth_rpc_url(&self) -> String {
@@ -52,6 +64,8 @@ impl CanoeProvider for CanoeSp1CCProvider {
 pub struct CanoeSp1CCReducedProofProvider {
     /// rpc to l1 geth node
     pub eth_rpc_url: String,
+    /// if true, execute and return a mock proof
+    pub mock_mode: bool,
 }
 
 #[async_trait]
@@ -62,7 +76,7 @@ impl CanoeProvider for CanoeSp1CCReducedProofProvider {
         &self,
         canoe_inputs: Vec<CanoeInput>,
     ) -> Result<Self::Receipt> {
-        let proof = get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url).await?;
+        let proof = get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url, self.mock_mode).await?;
         let SP1Proof::Compressed(proof) = proof.proof else {
             panic!("cannot get Sp1ReducedProof")
         };
@@ -77,6 +91,7 @@ impl CanoeProvider for CanoeSp1CCReducedProofProvider {
 async fn get_sp1_cc_proof(
     canoe_inputs: Vec<CanoeInput>,
     eth_rpc_url: &str,
+    mock_mode: bool,
 ) -> Result<sp1_sdk::SP1ProofWithPublicValues> {
     if canoe_inputs.is_empty() {
         return Err(CanoeProviderError::EmptyCanoeInput.into());
@@ -170,26 +185,55 @@ async fn get_sp1_cc_proof(
     stdin.write(&input_bytes);
     stdin.write(&canoe_inputs);
 
-    // Create a `ProverClient`.
-    let client = ProverClient::from_env();
-
-    // Execute the program using the `ProverClient.execute` method, without generating a proof.
-    let (_, report) = client
-        .execute(ELF, &stdin)
-        .run()
-        .expect("sp1-cc should have executed the ELF");
-    info!(
-        "executed program with {} cycles",
-        report.total_instruction_count()
-    );
-
-    // Generate the proof for the given program and input.
+    // Create a `NetworkProver`.
+    let network_private_key = env::var("NETWORK_PRIVATE_KEY").unwrap_or_else(|_| {
+        warn!("NETWORK_PRIVATE_KEY is not set, using default network private key");
+        DEFAULT_NETWORK_PRIVATE_KEY.to_string()
+    });
+    let client = ProverClient::builder()
+        .network()
+        .private_key(&network_private_key)
+        .build();
     let (pk, _vk) = client.setup(ELF);
-    let proof = client
-        .prove(&pk, &stdin)
-        .compressed()
-        .run()
-        .expect("sp1-cc should have produced a compressed proof");
+
+    let proof = if mock_mode {
+        // Execute the program using the `ProverClient.execute` method, without generating a proof.
+        let (public_values, report) = client
+            .execute(ELF, &stdin)
+            .run()
+            .expect("sp1-cc should have executed the ELF");
+        info!(
+            "executed program in mock mode with {} cycles and {} prover gas",
+            report.total_instruction_count(),
+            report
+                .gas
+                .expect("gas calculation is enabled by default in the executor")
+        );
+
+        // Create a mock aggregation proof with the public values.
+        SP1ProofWithPublicValues::create_mock_proof(
+            &pk,
+            public_values,
+            SP1ProofMode::Compressed,
+            SP1_CIRCUIT_VERSION,
+        )
+    } else {
+        // Generate the proof for the given program and input.
+        let proof = client
+            .prove(&pk, &stdin)
+            .compressed()
+            .strategy(FulfillmentStrategy::Hosted)
+            .skip_simulation(true)
+            .cycle_limit(1_000_000_000_000)
+            .gas_limit(1_000_000_000_000)
+            .timeout(Duration::from_secs(4 * 60 * 60))
+            .run()
+            .expect("sp1-cc should have produced a compressed proof");
+
+        info!("generated sp1-cc proof in non-mock mode");
+
+        proof
+    };
 
     let elapsed = start.elapsed();
     info!(
@@ -198,6 +242,5 @@ async fn get_sp1_cc_proof(
         "sp1-cc commited: in elapsed_time {:?}",
         elapsed,
     );
-
     Ok(proof)
 }

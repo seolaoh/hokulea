@@ -62,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
             use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
             use hokulea_proof::canoe_verifier::sp1_cc::CanoeSp1CCVerifier;
             use sp1_sdk::{ProverClient, HashableKey};
+            use std::env;
 
             const CANOE_SP1CC_ELF: &[u8] = canoe_sp1_cc_host::ELF;
             let client = ProverClient::from_env();
@@ -69,8 +70,15 @@ async fn main() -> anyhow::Result<()> {
 
             println!("canoe sp1cc v_key {:?}", canoe_vk.vk.hash_u32() );
 
+            let mock_mode = env::var("OP_SUCCINCT_MOCK")
+                .map(|v| v.to_ascii_lowercase())
+                .ok()
+                .and_then(|v| v.parse::<bool>().ok())
+                .unwrap_or(false);
+
             let canoe_provider = CanoeSp1CCReducedProofProvider{
                 eth_rpc_url: cfg.kona_cfg.l1_node_address.clone().unwrap(),
+                mock_mode,
             };
             let canoe_verifier = CanoeSp1CCVerifier{};
         } else {
