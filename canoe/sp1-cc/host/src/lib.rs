@@ -20,6 +20,8 @@ use std::{
 use tracing::{info, warn};
 use url::Url;
 
+use rsp_primitives::genesis::genesis_from_json;
+
 /// The ELF we want to execute inside the zkVM.
 pub const ELF: &[u8] = include_bytes!("../../elf/canoe-sp1-cc-client");
 
@@ -48,6 +50,8 @@ fn env_fulfillment_strategy(var_name: &str) -> FulfillmentStrategy {
     }
 }
 
+pub const KURTOSIS_DEVNET_GENESIS: &str = include_str!("./kurtosis_devnet_genesis.json");
+pub const HOLESKY_GENESIS: &str = include_str!("./holesky_genesis.json");
 /// A canoe provider implementation with Sp1 contract call
 /// CanoeSp1CCProvider produces the receipt of type SP1ProofWithPublicValues,
 /// SP1ProofWithPublicValues contains a Stark proof which can be verified in
@@ -120,6 +124,7 @@ async fn get_sp1_cc_proof(
     }
     // ensure chain id and l1 block number across all DAcerts are identical
     let l1_chain_id = canoe_inputs[0].l1_chain_id;
+
     let l1_head_block_number = canoe_inputs[0].l1_head_block_number;
     for canoe_input in canoe_inputs.iter() {
         assert!(canoe_input.l1_chain_id == l1_chain_id);
@@ -147,15 +152,23 @@ async fn get_sp1_cc_proof(
                 .build()
                 .await?
         }
-        // if genesis is not available in the sp1-cc library, the code uses the default Genesis, which currently in
-        // sp1-cc is the mainnet. Ideally, Sp1-cc should make it easier to use a custom genesis config.
+        // if genesis is not available in the sp1-cc library, the code uses custom genesis config
         Err(_) => {
-            warn!("Only use for testing environment");
+            let chain_config = match l1_chain_id {
+                17000 => genesis_from_json(HOLESKY_GENESIS).expect("genesis from json"),
+                3151908 => genesis_from_json(KURTOSIS_DEVNET_GENESIS).expect("genesis from json"),
+                _ => panic!("chain id {l1_chain_id} is not supported"),
+            };
+
+            let genesis = Genesis::Custom(chain_config.config);
+
             EvmSketch::builder()
                 .at_block(block_number)
+                .with_genesis(genesis)
                 .el_rpc_url(rpc_url)
                 .build()
-                .await?
+                .await
+                .expect("evm sketch builder")
         }
     };
 
@@ -188,7 +201,6 @@ async fn get_sp1_cc_proof(
                 returns == StatusCode::SUCCESS
             }
         };
-
         if is_valid != canoe_input.claimed_validity {
             panic!("in the host executor part, executor arrives to a different answer than the claimed answer. Something inconsistent in the view of eigenda-proxy and zkVM");
         }

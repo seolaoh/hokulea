@@ -23,7 +23,7 @@ use tracing::{info, warn};
 /// Both the ELF and v_key must be updated at the same time and merged to the repo
 /// TODO(bx) Figure out a way to automate the process
 pub const V_KEY: [u32; 8] = [
-    1219192901, 8919521, 652817027, 1590006531, 414060243, 1639904125, 768591396, 1492827050,
+    26697266, 1233535040, 476006671, 1703803682, 502212170, 857647097, 1381641220, 389688494,
 ];
 
 #[derive(Clone)]
