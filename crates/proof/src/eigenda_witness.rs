@@ -55,11 +55,3 @@ pub struct EigenDAWitness {
     /// correct
     pub canoe_proof_bytes: Option<Vec<u8>>,
 }
-
-impl EigenDAWitness {
-    /// require_canoe_proof checks if there is at least one canoe proof needed for any DAcerts
-    /// in the eigenda blob derivation
-    pub fn require_canoe_proof(&self) -> bool {
-        !self.validities.is_empty()
-    }
-}

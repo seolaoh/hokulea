@@ -4,7 +4,7 @@ use alloy_sol_types::{sol_data::Bool, SolType};
 use anyhow::Result;
 use async_trait::async_trait;
 use canoe_bindings::StatusCode;
-use canoe_provider::{CanoeInput, CanoeProvider, CanoeProviderError, CertVerifierCall};
+use canoe_provider::{CanoeInput, CanoeProvider, CertVerifierCall};
 use eigenda_cert::EigenDAVersionedCert;
 use sp1_cc_client_executor::ContractInput;
 use sp1_cc_host_executor::{EvmSketch, Genesis};
@@ -72,8 +72,13 @@ impl CanoeProvider for CanoeSp1CCProvider {
     async fn create_certs_validity_proof(
         &self,
         canoe_inputs: Vec<CanoeInput>,
-    ) -> Result<Self::Receipt> {
-        get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url, self.mock_mode).await
+    ) -> Option<Result<Self::Receipt>> {
+        // if there is nothing to prove against return early
+        if canoe_inputs.is_empty() {
+            return None;
+        }
+
+        Some(get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url, self.mock_mode).await)
     }
 
     fn get_eth_rpc_url(&self) -> String {
@@ -101,12 +106,21 @@ impl CanoeProvider for CanoeSp1CCReducedProofProvider {
     async fn create_certs_validity_proof(
         &self,
         canoe_inputs: Vec<CanoeInput>,
-    ) -> Result<Self::Receipt> {
-        let proof = get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url, self.mock_mode).await?;
-        let SP1Proof::Compressed(proof) = proof.proof else {
-            panic!("cannot get Sp1ReducedProof")
-        };
-        Ok(*proof)
+    ) -> Option<Result<Self::Receipt>> {
+        // if there is nothing to prove against return early
+        if canoe_inputs.is_empty() {
+            return None;
+        }
+
+        match get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url, self.mock_mode).await {
+            Ok(proof) => {
+                let SP1Proof::Compressed(proof) = proof.proof else {
+                    panic!("cannot get Sp1ReducedProof")
+                };
+                Some(Ok(*proof))
+            }
+            Err(e) => Some(Err(e)),
+        }
     }
 
     fn get_eth_rpc_url(&self) -> String {
@@ -119,9 +133,6 @@ async fn get_sp1_cc_proof(
     eth_rpc_url: &str,
     mock_mode: bool,
 ) -> Result<sp1_sdk::SP1ProofWithPublicValues> {
-    if canoe_inputs.is_empty() {
-        return Err(CanoeProviderError::EmptyCanoeInput.into());
-    }
     // ensure chain id and l1 block number across all DAcerts are identical
     let l1_chain_id = canoe_inputs[0].l1_chain_id;
 

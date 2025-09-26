@@ -12,12 +12,14 @@ use tracing::info;
 /// A helper function to create canoe proof by the provided canoe provider.
 /// The function relies on data stored in the oracle, for l1_head, l1_head_header.number
 /// and chain_id.
+///
+/// If no canoe proof is needed, it returns Ok(None)
 pub async fn from_boot_info_to_canoe_proof<P, O>(
     boot_info: &BootInfo,
     witness: &EigenDAWitness,
     oracle: Arc<O>,
     canoe_provider: P,
-) -> anyhow::Result<P::Receipt>
+) -> anyhow::Result<Option<P::Receipt>>
 where
     P: CanoeProvider,
     O: CommsClient + FlushableCache + Send + Sync + Debug,
@@ -52,9 +54,14 @@ where
         canoe_inputs.push(canoe_input);
     }
 
-    let canoe_proof = canoe_provider
+    match canoe_provider
         .create_certs_validity_proof(canoe_inputs)
-        .await?;
-
-    Ok(canoe_proof)
+        .await
+    {
+        Some(result) => {
+            let proof = result?;
+            Ok(Some(proof))
+        }
+        None => Ok(None),
+    }
 }
