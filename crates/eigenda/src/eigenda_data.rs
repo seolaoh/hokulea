@@ -1,3 +1,6 @@
+//! Contains Kona and EigenDA blob derivation pipeline. Typically rollup or
+//! proving stack use their own derivation pipeline with customization.
+
 use crate::{
     errors::{EncodedPayloadDecodingError, HokuleaStatelessError},
     BYTES_PER_FIELD_ELEMENT,
@@ -10,7 +13,7 @@ use serde::{Deserialize, Serialize};
 /// Represents raw payload bytes, alias
 pub type Payload = Bytes;
 
-#[derive(Default, Clone, Debug, Deserialize, Serialize)]
+#[derive(Default, Clone, Debug, Deserialize, Serialize, PartialEq)]
 // [EigenDAWitness] requires serde for EncodedPayload
 /// intended for deriving rollup channel frame from eigenda encoded payload
 pub struct EncodedPayload {
@@ -53,6 +56,14 @@ impl EncodedPayload {
             }
             .into());
         }
+
+        if self.encoded_payload.len() % BYTES_PER_FIELD_ELEMENT != 0 {
+            return Err(EncodedPayloadDecodingError::InvalidLengthEncodedPayload(
+                self.encoded_payload.len() as u64,
+            )
+            .into());
+        }
+
         // Check encoded payload has a power of two number of field elements
         let num_field_elements = self.encoded_payload.len() / BYTES_PER_FIELD_ELEMENT;
         if !is_power_of_two(num_field_elements) {
@@ -103,7 +114,9 @@ impl EncodedPayload {
         // Decode the body by removing internal 0 byte padding (0x00 initial byte for every 32 byte chunk)
         // The decodedBody should contain the payload bytes + potentially some external padding bytes.
         let decoded_body = helpers::remove_internal_padding(body.as_ref()).map_err(|_| {
-            EncodedPayloadDecodingError::InvalidLengthInEncodedPayloadBody(body.len() as u64)
+            EncodedPayloadDecodingError::InvalidLengthEncodedPayload(
+                self.encoded_payload.len() as u64
+            )
         })?;
         let decoded_body: Bytes = decoded_body.into();
 
@@ -219,10 +232,178 @@ mod tests {
         encoded_payload.encoded_payload.truncate(33);
         let result = encoded_payload.decode();
         assert!(result.is_err());
-        // after truncation, 33 - 32(header length) = 1
         assert_eq!(
             result.unwrap_err(),
-            EncodedPayloadDecodingError::InvalidLengthInEncodedPayloadBody(1).into()
+            EncodedPayloadDecodingError::InvalidLengthEncodedPayload(33).into()
         );
+    }
+
+    #[test]
+    fn test_serde_on_encoded_payload() {
+        let rollup_data = vec![1, 2, 3, 4];
+        let encoded_payload = encode(&rollup_data, PAYLOAD_ENCODING_VERSION_0);
+        let ser = encoded_payload.serialize();
+        let deserialized_encoded_payload = EncodedPayload::deserialize(ser.clone());
+        assert_eq!(encoded_payload, deserialized_encoded_payload);
+    }
+
+    #[test]
+    fn test_check_len_invariant() {
+        struct Case {
+            input: vec::Vec<u8>,
+            result: Result<(), HokuleaStatelessError>,
+        }
+        let cases = [
+            // not long enough
+            Case {
+                input: vec![1, 2, 3, 4],
+                result: Err(EncodedPayloadDecodingError::PayloadTooShortForHeader {
+                    expected: 32,
+                    actual: 4,
+                }
+                .into()),
+            },
+            // not power of 2
+            Case {
+                input: vec![0; 96],
+                result: Err(EncodedPayloadDecodingError::InvalidPowerOfTwoLength(
+                    96 / BYTES_PER_FIELD_ELEMENT,
+                )
+                .into()),
+            },
+            // not divide 32
+            Case {
+                input: vec![0; 34],
+                result: Err(EncodedPayloadDecodingError::InvalidLengthEncodedPayload(34).into()),
+            },
+            Case {
+                input: vec![0; 64],
+                result: Ok(()),
+            },
+        ];
+
+        for case in cases {
+            let encoded_payload = EncodedPayload {
+                encoded_payload: case.input.into(),
+            };
+            if let Err(e) = encoded_payload.check_len_invariant() {
+                assert_eq!(Err(e), case.result)
+            }
+        }
+    }
+
+    #[test]
+    fn test_decode_header() {
+        struct Case {
+            input: vec::Vec<u8>,
+            result: Result<u32, HokuleaStatelessError>,
+        }
+        let cases = [
+            // insufficient length
+            Case {
+                input: vec![1, 2, 3, 4],
+                result: Err(EncodedPayloadDecodingError::PayloadTooShortForHeader {
+                    expected: 32,
+                    actual: 4,
+                }
+                .into()),
+            },
+            // First byte is not 0
+            Case {
+                input: vec![1; 32],
+                result: Err(EncodedPayloadDecodingError::InvalidHeaderFirstByte(1).into()),
+            },
+            // unknown encoding version
+            Case {
+                input: vec![
+                    0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2,
+                ],
+                result: Err(EncodedPayloadDecodingError::UnknownEncodingVersion(2).into()),
+            },
+            // working case
+            Case {
+                input: vec![
+                    0, 0, 0, 0, 0, 129, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2,
+                ],
+                result: Ok(129),
+            },
+        ];
+
+        for case in cases {
+            let encoded_payload = EncodedPayload {
+                encoded_payload: case.input.into(),
+            };
+            match encoded_payload.decode_header() {
+                Ok(length) => assert_eq!(length, case.result.unwrap()),
+                Err(err) => assert_eq!(Err(err), case.result),
+            }
+        }
+    }
+
+    #[test]
+    fn test_decode_payload() {
+        struct Case {
+            input: vec::Vec<u8>,
+            result: Result<Bytes, HokuleaStatelessError>,
+        }
+        let cases = [
+            // invalid length not divide 32 byte, which is size of field element
+            Case {
+                // 33 bytes
+                input: vec![
+                    0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 2,
+                ],
+                result: Err(EncodedPayloadDecodingError::InvalidLengthEncodedPayload(33).into()),
+            },
+            Case {
+                // 64 bytes
+                input: vec![
+                    0, 0, 0, 0, 0, 128, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                ],
+                result: Err(EncodedPayloadDecodingError::UnpaddedDataTooShort {
+                    // acutal = 64 - 32 - 1 (encoding pad byte)
+                    actual: 31,
+                    claimed: 128,
+                }
+                .into()),
+            },
+            Case {
+                // 64 bytes
+                input: vec![
+                    0, 0, 0, 0, 0, 31, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                ],
+                result: Ok(vec![1; 31].into()),
+            },
+            Case {
+                // 64 bytes with special case when length is 0
+                input: vec![
+                    0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                ],
+                result: Ok(vec![1].into()),
+            },
+        ];
+
+        for case in cases {
+            let encoded_payload = EncodedPayload {
+                encoded_payload: case.input.into(),
+            };
+            let length_in_byte = encoded_payload
+                .decode_header()
+                .expect("should have decoded header successfully");
+
+            match encoded_payload.decode_payload(length_in_byte) {
+                Ok(payload) => assert_eq!(Ok(payload), case.result),
+                Err(e) => assert_eq!(Err(e), case.result),
+            }
+        }
     }
 }
