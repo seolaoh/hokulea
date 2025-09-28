@@ -1,10 +1,10 @@
-//! High level Error type defined by hokulea
+//! High level application error type for eigenda blob derivation
 
 use alloc::string::{String, ToString};
 use eigenda_cert::AltDACommitmentParseError;
 
 /// Actionable hokulea error
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum HokuleaErrorKind {
     /// for cert that has violated the rules in hokulea derivation
     #[error("Discard {0}")]
@@ -17,8 +17,10 @@ pub enum HokuleaErrorKind {
     Temporary(String),
 }
 
-/// A list of Hokulea error purely out of data processing, and is decoupled from
-/// the error from error out of the preimage error
+/// Both [HokuleaStatelessError] and [HokuleaPreimageError] defined at the bottom
+/// represents all application error for hokulea. The [HokuleaStatelessError] is
+/// different that the errors comes from pure data processing of altDA commitment
+/// and encoded payload
 #[derive(Debug, thiserror::Error, PartialEq)]
 #[error(transparent)]
 pub enum HokuleaStatelessError {
@@ -29,9 +31,6 @@ pub enum HokuleaStatelessError {
     /// use source because eventualy hokulea error will be overwritten into pipeline error
     #[error("parsing error {0}")]
     ParseError(#[source] AltDACommitmentParseError),
-    /// field element is out of bn254 field, a critical error
-    #[error("field element too large")]
-    FieldElementRangeError,
     /// encoded payload decoding error, inbox sender has violated the encoding rule
     #[error("cannot decode an encoded payload")]
     DecodingError(#[from] EncodedPayloadDecodingError),
@@ -45,9 +44,6 @@ impl From<HokuleaStatelessError> for HokuleaErrorKind {
                 HokuleaErrorKind::Discard("Insufficient EigenDA Cert Length".to_string())
             }
             HokuleaStatelessError::ParseError(e) => HokuleaErrorKind::Discard(e.to_string()),
-            HokuleaStatelessError::FieldElementRangeError => {
-                HokuleaErrorKind::Critical("field element too large".to_string())
-            }
             HokuleaStatelessError::DecodingError(e) => HokuleaErrorKind::Discard(e.to_string()),
         }
     }
@@ -86,10 +82,11 @@ pub enum EncodedPayloadDecodingError {
     },
 }
 
-/// A list of Hokulea error derived from data from preimage oracle
-/// This error is intended for application logics, and it is separate from
-/// the more basic error type that deals with HokuleaOracleProviderError
-/// which hanldes communicates, response format error
+/// The [HokuleaPreimageError] contains application errors, that is directly relates
+/// to the preimage returned by the preimage provider. There is no error for
+/// EncodedPayload which is also a preimage, because EncodedPayload is only a vector
+/// of bytes, but its decoding check is covered by [HokuleaStatelessError] in the data
+/// processing stage.
 #[derive(Debug, thiserror::Error, PartialEq)]
 #[error(transparent)]
 pub enum HokuleaPreimageError {
