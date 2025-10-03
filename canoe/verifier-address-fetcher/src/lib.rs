@@ -1,15 +1,19 @@
+//! create [CanoeVerifierAddressFetcher] trait which returns contract verifier address, which the
+//! CanoeVerifier and CanoeProvider relies on to verify and prove the smart contract logic against.
+//! EigenLabs deploys CertVerifier and CertVerifier router contracts on each chains. However, a
+//! rollup has the option to deployed their own CertVerifier or router, if the rollup has security
+//! constraint.
+#![no_std]
 use alloy_primitives::{address, Address};
 use eigenda_cert::EigenDAVersionedCert;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CanoeVerifierAddressFetcherError {
-    /// Cannot fetch address for chainID for abi encoding interface
-    #[error("Unable to fetch contract address at chain id {0} for abi encode interface, available for router and at least V3 certificate")]
+    /// Cannot fetch address for chainID
+    #[error("Unable to fetch contract address with chain id {0} for abi encode interface, available for router and at least V3 certificate")]
     UnknownChainIDForABIEncodeInterface(u64),
-    /// Cannot fetch address for chainID for legacy interface
-    #[error(
-        "Unable to fetch contract address at chain id {0} for legacy interface for V2 certificate"
-    )]
+    /// Invalid Cert validity response
+    #[error("Unable to fetch contract address with chain id {0} for legacy interface for V2 certificate")]
     UnknownChainIDForLegacyInterface(u64),
 }
 
@@ -23,9 +27,9 @@ pub trait CanoeVerifierAddressFetcher: Clone + Send + 'static {
 }
 
 #[derive(Clone)]
-pub struct CanoeNoOpCanoeVerifierAddressFetcher {}
+pub struct CanoeNoOpVerifierAddressFetcher {}
 
-impl CanoeVerifierAddressFetcher for CanoeNoOpCanoeVerifierAddressFetcher {
+impl CanoeVerifierAddressFetcher for CanoeNoOpVerifierAddressFetcher {
     fn fetch_address(
         &self,
         _chain_id: u64,

@@ -1,6 +1,7 @@
-use crate::canoe_verifier::errors::HokuleaCanoeVerificationError;
-use crate::canoe_verifier::CanoeVerifier;
-use crate::cert_validity::CertValidity;
+//! implement [CanoeVerifier] with steel
+#![no_std]
+extern crate alloc;
+
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use eigenda_cert::AltDACommitment;
@@ -8,6 +9,7 @@ use eigenda_cert::AltDACommitment;
 use risc0_zkvm::Receipt;
 
 use canoe_steel_methods::CERT_VERIFICATION_ID;
+use canoe_verifier::{CanoeVerifier, CertValidity, HokuleaCanoeVerificationError};
 use tracing::info;
 
 #[derive(Clone)]
@@ -32,7 +34,8 @@ impl CanoeVerifier for CanoeSteelVerifier {
 
         cfg_if::cfg_if! {
             if #[cfg(target_os = "zkvm")] {
-                risc0_zkvm::guest::env;
+                use risc0_zkvm::guest::env;
+                use tracing::warn;
                 if canoe_proof_bytes.is_some() {
                     // Risc0 doc https://github.com/risc0/risc0/tree/main/examples/composition
                     warn!("steel verification within zkvm requires proof provided via zkVM STDIN by the 'add_assumption'
