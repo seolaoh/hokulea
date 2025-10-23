@@ -51,12 +51,14 @@ hokulea-zkvm-verification = { path = "crates/zkvm-verification", version = "0.1.
 eigenda-cert = { path = "crates/eigenda-cert" }
 
 # Alloy (Network)
-alloy-provider = { version = "1.0.38", default-features = false }
 alloy-rlp = { version = "0.3.12", default-features = false }
+alloy-provider = { version = "1.0.38", default-features = false }
 alloy-consensus = { version = "1.0.38", default-features = false }
 alloy-rpc-types = { version = "1.0.38", default-features = false }
+alloy-genesis = { version = "1.0.38", default-features = false }
 alloy-primitives = { version = "1.3.1", default-features = false }
 alloy-sol-types = { version = "1.3.1", default-features = false }
+
 
 # Execution
 alloy-evm = { version = "0.21.0", default-features = false }
@@ -127,6 +129,13 @@ sp1-cc-client-executor = { git = "https://github.com/succinctlabs/sp1-contract-c
 sp1-cc-host-executor = { git = "https://github.com/succinctlabs/sp1-contract-call.git", tag = "reth-1.8.2b" }
 # reth-1.8.2 is also used by reth-1.8.2b
 rsp-primitives = { git = "https://github.com/succinctlabs/rsp", rev = "reth-1.8.2" } 
+reth-primitives = { git = "https://github.com/paradigmxyz/reth", tag = "v1.8.2", default-features = false, features = [
+    "alloy-compat",
+    "std",
+] }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.8.2", default-features = false }
+reth-evm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.8.2", default-features = false }
+
 
 # ZKVM deps
 hex = "0.4"

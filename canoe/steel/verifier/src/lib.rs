@@ -70,7 +70,6 @@ impl CanoeVerifier for CanoeSteelVerifier {
         let mut journals: Vec<Journal> = Vec::new();
         for (altda_commitment, cert_validity) in &cert_validity_pairs {
             let rlp_bytes = altda_commitment.to_rlp_bytes();
-            assert!(cert_validity.chain_config_hash.is_none());
 
             let journal = Journal {
                 certVerifierAddress: cert_validity.verifier_address,

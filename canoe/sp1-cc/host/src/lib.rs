@@ -1,9 +1,9 @@
-use alloy_primitives::{Address, B256};
+use alloy_primitives::Address;
 use alloy_rpc_types::BlockNumberOrTag;
 use alloy_sol_types::{sol_data::Bool, SolType};
 use anyhow::Result;
 use async_trait::async_trait;
-use canoe_bindings::{Journal, StatusCode};
+use canoe_bindings::StatusCode;
 use canoe_provider::{CanoeInput, CanoeProvider, CertVerifierCall};
 use sp1_cc_client_executor::ContractInput;
 use sp1_cc_host_executor::{EvmSketch, Genesis};
@@ -80,21 +80,6 @@ impl CanoeProvider for CanoeSp1CCProvider {
 
         Some(get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url, self.mock_mode).await)
     }
-
-    fn get_config_hash(&self, receipt: &Self::Receipt) -> Option<B256> {
-        let journals: Vec<Journal> = bincode::deserialize(receipt.public_values.as_slice())
-            .expect("should be able to deserialize to journals");
-        assert!(!journals.is_empty());
-        let chain_config_hash = journals[0].chainConfigHash;
-        for journal in journals {
-            assert_eq!(chain_config_hash, journal.chainConfigHash);
-        }
-        Some(chain_config_hash)
-    }
-
-    fn get_recursive_proof(&self, receipt: &Self::Receipt) -> Option<Self::Proof> {
-        Some(receipt.clone())
-    }
 }
 
 /// A canoe provider implementation with Sp1 contract call
@@ -134,22 +119,6 @@ impl CanoeProvider for CanoeSp1CCReducedProofProvider {
             }
             Err(e) => Some(Err(e)),
         }
-    }
-
-    fn get_config_hash(&self, receipt: &Self::Receipt) -> Option<B256> {
-        let journals: Vec<Journal> = bincode::deserialize(receipt.1.as_slice())
-            .expect("should be able to deserialize to journals");
-        assert!(!journals.is_empty());
-        let chain_config_hash = journals[0].chainConfigHash;
-        // all chainConfigHash must be identical
-        for journal in journals {
-            assert_eq!(chain_config_hash, journal.chainConfigHash);
-        }
-        Some(chain_config_hash)
-    }
-
-    fn get_recursive_proof(&self, receipt: &Self::Receipt) -> Option<Self::Proof> {
-        Some(receipt.0.clone())
     }
 }
 

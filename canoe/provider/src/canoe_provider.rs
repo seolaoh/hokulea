@@ -44,18 +44,6 @@ pub trait CanoeProvider: Clone + Send + 'static {
         &self,
         _canoe_inputs: Vec<CanoeInput>,
     ) -> Option<Result<Self::Receipt>>;
-
-    /// get_config_hash allows getting l1 config hash from receipt. Note some backend like steel does not
-    /// need it, and return None. It is up to the implementer to decide if its CanoeProvider provides it.
-    /// Within the client program, sp1-cc allows custom genesis, whereas steel provides only a few genesis
-    /// to convert input based on chainID. For sp1-cc, adversary can use a legit chain id, but change all
-    /// other fields in the genesis. Hence it is critical that the entire config hash is commited. By
-    /// having this function, the host has a mean to extract teh config hash, and provide it to the verifier,
-    /// which will be verified within zkVM.
-    fn get_config_hash(&self, receipt: &Self::Receipt) -> Option<B256>;
-
-    /// get_recursive_proof returns the zk proof which can be recursively verified by zk vm
-    fn get_recursive_proof(&self, receipt: &Self::Receipt) -> Option<Self::Proof>;
 }
 
 #[derive(Clone)]
@@ -70,14 +58,6 @@ impl CanoeProvider for CanoeNoOpProvider {
         &self,
         _canoe_inputs: Vec<CanoeInput>,
     ) -> Option<Result<Self::Receipt>> {
-        None
-    }
-
-    fn get_config_hash(&self, _receipt: &Self::Receipt) -> Option<B256> {
-        None
-    }
-
-    fn get_recursive_proof(&self, _receipt: &Self::Receipt) -> Option<Self::Proof> {
         None
     }
 }

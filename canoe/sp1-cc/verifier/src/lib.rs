@@ -2,12 +2,19 @@
 #![no_std]
 extern crate alloc;
 
-use alloc::vec::Vec;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use alloy_genesis::Genesis;
+use alloy_primitives::{keccak256, B256, U256};
+use alloy_sol_types::SolValue;
 use canoe_bindings::Journal;
 use canoe_verifier::{CanoeVerifier, CertValidity, HokuleaCanoeVerificationError};
 use eigenda_cert::AltDACommitment;
-use revm_primitives::hardfork::SpecId;
-use sp1_cc_client_executor::verifiy_chain_config_eth;
+use reth_chainspec::{Chain, ChainSpec, ChainSpecBuilder, MAINNET, SEPOLIA};
+use reth_evm::spec_by_timestamp_and_block_number;
+use sp1_cc_client_executor::ChainConfig;
 
 use tracing::{info, warn};
 
@@ -32,11 +39,6 @@ use tracing::{info, warn};
 pub const V_KEY: [u32; 8] = [
     1643941578, 715951059, 1788838312, 1249088288, 1765888335, 45618231, 776381573, 1059800200,
 ];
-
-/// Determine the active fork in L1 chain. It must match the active fork version used by sp1-cc for that specific
-/// L1 block height. If there is more active L1 fork, but the verions of sp1-cc used is not up to date. The L1_ACTIVE_FORK
-/// must be kept identical to sp1-cc, but it is best to update sp1-cc version.
-pub const L1_ACTIVE_FORK: SpecId = SpecId::PRAGUE;
 
 #[derive(Clone)]
 pub struct CanoeSp1CCVerifier {}
@@ -87,14 +89,11 @@ impl CanoeVerifier for CanoeSp1CCVerifier {
         for (altda_commitment, cert_validity) in &cert_validity_pairs {
             let rlp_bytes = altda_commitment.to_rlp_bytes();
 
-            let chain_config_hash = cert_validity
-                .chain_config_hash
-                .expect("sp1cc verifier expects l1 chain config hash");
-
-            // check chain_config_hash supplied by the host is indeed correct with respect to l1 chain id
-            // and active fork
-            verifiy_chain_config_eth(chain_config_hash, cert_validity.l1_chain_id, L1_ACTIVE_FORK)
-                .expect("sp1cc canoe verifies chain config should have succeeded");
+            let chain_config_hash_derive = derive_chain_config_hash(
+                cert_validity.l1_chain_id,
+                cert_validity.l1_head_block_timestamp,
+                cert_validity.l1_head_block_number,
+            );
 
             let journal = Journal {
                 certVerifierAddress: cert_validity.verifier_address,
@@ -102,12 +101,81 @@ impl CanoeVerifier for CanoeSp1CCVerifier {
                 blockhash: cert_validity.l1_head_block_hash,
                 output: cert_validity.claimed_validity,
                 l1ChainId: cert_validity.l1_chain_id,
-                chainConfigHash: chain_config_hash,
+                chainConfigHash: chain_config_hash_derive,
             };
 
             journals.push(journal);
         }
 
         bincode::serialize(&journals).expect("should be able to serialize")
+    }
+}
+
+fn derive_chain_config_hash(
+    l1_chain_id: u64,
+    l1_head_block_timestamp: u64,
+    l1_head_block_number: u64,
+) -> B256 {
+    let spec_id = match l1_chain_id {
+        1 => spec_by_timestamp_and_block_number(
+            MAINNET.as_ref(),
+            l1_head_block_timestamp,
+            l1_head_block_number,
+        ),
+        11155111 => spec_by_timestamp_and_block_number(
+            SEPOLIA.as_ref(),
+            l1_head_block_timestamp,
+            l1_head_block_number,
+        ),
+        3151908 => {
+            let chain_spec = create_kurtosis_chain_spec();
+            spec_by_timestamp_and_block_number(
+                &chain_spec,
+                l1_head_block_timestamp,
+                l1_head_block_number,
+            )
+        }
+        _ => panic!("unsupported chain id"),
+    };
+    hash_chain_config(l1_chain_id, spec_id.to_string())
+}
+
+fn hash_chain_config(chain_id: u64, active_fork_name: String) -> B256 {
+    let chain_config = ChainConfig {
+        chainId: U256::from(chain_id),
+        activeForkName: active_fork_name,
+    };
+
+    keccak256(chain_config.abi_encode_packed())
+}
+
+fn create_kurtosis_chain_spec() -> ChainSpec {
+    ChainSpecBuilder::default()
+        .chain(Chain::from_id(3151908))
+        .genesis(Genesis::default())
+        .homestead_activated()
+        .byzantium_activated()
+        .constantinople_activated()
+        .petersburg_activated()
+        .istanbul_activated()
+        .berlin_activated()
+        .london_activated()
+        .shanghai_activated()
+        .cancun_activated()
+        .prague_activated()
+        .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use revm_primitives::hardfork::SpecId;
+
+    use super::*;
+
+    #[test]
+    fn test_create_kurtosis_chain_spec() {
+        let chain_spec = create_kurtosis_chain_spec();
+        let spec_id = spec_by_timestamp_and_block_number(&chain_spec, 100, 100);
+        assert_eq!(spec_id, SpecId::PRAGUE);
     }
 }
