@@ -31,7 +31,6 @@ pub struct CanoeInput {
 #[async_trait]
 pub trait CanoeProvider: Clone + Send + 'static {
     type Receipt: Serialize + for<'de> Deserialize<'de>;
-    type Proof: Serialize + for<'de> Deserialize<'de>;
 
     /// create_certs_validity_proof takes a vector of canoe inputs and produces one zk proof attesting
     /// all the claimed validity in vector are indeed correct.
@@ -52,7 +51,6 @@ pub struct CanoeNoOpProvider {}
 #[async_trait]
 impl CanoeProvider for CanoeNoOpProvider {
     type Receipt = ();
-    type Proof = ();
 
     async fn create_certs_validity_proof(
         &self,

@@ -66,7 +66,6 @@ pub struct CanoeSp1CCProvider {
 
 #[async_trait]
 impl CanoeProvider for CanoeSp1CCProvider {
-    type Proof = sp1_sdk::SP1ProofWithPublicValues;
     type Receipt = sp1_sdk::SP1ProofWithPublicValues;
 
     async fn create_certs_validity_proof(
@@ -97,8 +96,7 @@ pub struct CanoeSp1CCReducedProofProvider {
 
 #[async_trait]
 impl CanoeProvider for CanoeSp1CCReducedProofProvider {
-    type Proof = sp1_core_executor::SP1ReduceProof<sp1_prover::InnerSC>;
-    type Receipt = (Self::Proof, Vec<u8>);
+    type Receipt = sp1_core_executor::SP1ReduceProof<sp1_prover::InnerSC>;
 
     async fn create_certs_validity_proof(
         &self,
@@ -111,11 +109,10 @@ impl CanoeProvider for CanoeSp1CCReducedProofProvider {
 
         match get_sp1_cc_proof(canoe_inputs, &self.eth_rpc_url, self.mock_mode).await {
             Ok(proof) => {
-                let journals_bytes = proof.public_values.to_vec();
                 let SP1Proof::Compressed(proof) = proof.proof else {
                     panic!("cannot get Sp1ReducedProof")
                 };
-                Some(Ok((*proof, journals_bytes)))
+                Some(Ok(*proof))
             }
             Err(e) => Some(Err(e)),
         }
