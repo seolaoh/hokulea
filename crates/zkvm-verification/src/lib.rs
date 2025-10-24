@@ -21,7 +21,9 @@ use alloc::sync::Arc;
 // bootInfo is secured. It uses all the secure information to verify against the canoe proof to ensure the
 // validity of the cert. Then it checks the consistency between kzg commitment from the cert and the encoded payload.
 // The function takes an oracle at whole, and assume what is inside the oracle will be or already been verified
-// by kona or upstream secure integration
+// by kona or upstream secure integration.
+// The functions also relies on the header corresponding to l1_head from BootInfo. It is critical for the security
+// that the oracle that provides the header has already been verified, or evetually verified without mutation.
 #[allow(clippy::type_complexity)]
 pub async fn eigenda_witness_to_preloaded_provider<O>(
     oracle: Arc<O>,
@@ -36,7 +38,7 @@ where
     let boot_info_chain_id = boot_info.rollup_config.l1_chain_id;
     let l1_head = boot_info.l1_head;
 
-    // fetch timestamp and block number info useful for determining activation fork
+    // fetch timestamp and block number corresponding to l1_head for determining activation fork.
     let mut l1_oracle_provider = OracleL1ChainProvider::new(l1_head, oracle);
     let header = l1_oracle_provider
         .header_by_hash(l1_head)
@@ -48,10 +50,7 @@ where
     // it is critical that some field of the witness is populated inside the zkVM using known truth within the zkVM
     // force canoe verifier to use l1 chain id from rollup config.
     // it assumes the l1_chain_id from boot_info is trusted or verifiable at early or later stage
-    //
-    // Note, the chain_config_hash is not provided by via boot info. The l1 boot info is included only after
-    // kona 1.1.3 release. For backward compatibility, we accept the hash returned from the certValidity but
-    // verify it inside Canoe Verifier
+    // it assumes the header from oracle is trusted or verifiable at early or later stage
     witness
         .validities
         .iter_mut()

@@ -111,6 +111,8 @@ impl CanoeVerifier for CanoeSp1CCVerifier {
     }
 }
 
+/// derive_chain_config_hash locates the active fork first, then compute the chain
+/// config hash.
 fn derive_chain_config_hash(
     l1_chain_id: u64,
     l1_head_block_timestamp: u64,
@@ -140,6 +142,9 @@ fn derive_chain_config_hash(
     hash_chain_config(l1_chain_id, spec_id.to_string())
 }
 
+/// hash_chain_config implements the method which sp1-cc uses to commit chain spec
+/// and active fork. See
+/// <https://github.com/succinctlabs/sp1-contract-call/blob/9d9a45c550d3373dbf9bd7fb1f4907356f657722/crates/client-executor/src/lib.rs#L340>
 fn hash_chain_config(chain_id: u64, active_fork_name: String) -> B256 {
     let chain_config = ChainConfig {
         chainId: U256::from(chain_id),
@@ -149,6 +154,8 @@ fn hash_chain_config(chain_id: u64, active_fork_name: String) -> B256 {
     keccak256(chain_config.abi_encode_packed())
 }
 
+/// create_kurtosis_chain_spec provides a testing utility for kurtosis devnet.
+/// the latest active fork is prague
 fn create_kurtosis_chain_spec() -> ChainSpec {
     ChainSpecBuilder::default()
         .chain(Chain::from_id(3151908))
@@ -168,9 +175,8 @@ fn create_kurtosis_chain_spec() -> ChainSpec {
 
 #[cfg(test)]
 mod tests {
-    use revm_primitives::hardfork::SpecId;
-
     use super::*;
+    use revm_primitives::hardfork::SpecId;
 
     #[test]
     fn test_create_kurtosis_chain_spec() {
