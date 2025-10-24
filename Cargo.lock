@@ -2440,7 +2440,6 @@ dependencies = [
 name = "canoe-sp1-cc-verifier"
 version = "0.1.0"
 dependencies = [
- "alloy-genesis",
  "alloy-primitives 1.4.0",
  "alloy-sol-types",
  "bincode",
@@ -2448,9 +2447,6 @@ dependencies = [
  "canoe-verifier",
  "cfg-if",
  "eigenda-cert",
- "reth-chainspec",
- "reth-evm",
- "revm-primitives",
  "sha2 0.10.9",
  "sp1-cc-client-executor",
  "sp1-lib",
@@ -2513,8 +2509,12 @@ dependencies = [
 name = "canoe-verifier"
 version = "0.1.0"
 dependencies = [
+ "alloy-genesis",
  "alloy-primitives 1.4.0",
  "eigenda-cert",
+ "reth-chainspec",
+ "reth-evm",
+ "revm-primitives",
  "serde",
  "thiserror 2.0.17",
 ]

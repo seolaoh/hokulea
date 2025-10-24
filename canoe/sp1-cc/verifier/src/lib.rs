@@ -6,14 +6,11 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use alloy_genesis::Genesis;
 use alloy_primitives::{keccak256, B256, U256};
 use alloy_sol_types::SolValue;
 use canoe_bindings::Journal;
-use canoe_verifier::{CanoeVerifier, CertValidity, HokuleaCanoeVerificationError};
+use canoe_verifier::{chain_spec, CanoeVerifier, CertValidity, HokuleaCanoeVerificationError};
 use eigenda_cert::AltDACommitment;
-use reth_chainspec::{Chain, ChainSpec, ChainSpecBuilder, MAINNET, SEPOLIA};
-use reth_evm::spec_by_timestamp_and_block_number;
 use sp1_cc_client_executor::ChainConfig;
 
 use tracing::{info, warn};
@@ -118,27 +115,11 @@ fn derive_chain_config_hash(
     l1_head_block_timestamp: u64,
     l1_head_block_number: u64,
 ) -> B256 {
-    let spec_id = match l1_chain_id {
-        1 => spec_by_timestamp_and_block_number(
-            MAINNET.as_ref(),
-            l1_head_block_timestamp,
-            l1_head_block_number,
-        ),
-        11155111 => spec_by_timestamp_and_block_number(
-            SEPOLIA.as_ref(),
-            l1_head_block_timestamp,
-            l1_head_block_number,
-        ),
-        3151908 => {
-            let chain_spec = create_kurtosis_chain_spec();
-            spec_by_timestamp_and_block_number(
-                &chain_spec,
-                l1_head_block_timestamp,
-                l1_head_block_number,
-            )
-        }
-        _ => panic!("unsupported chain id"),
-    };
+    let spec_id = chain_spec::derive_chain_config_hash(
+        l1_chain_id,
+        l1_head_block_timestamp,
+        l1_head_block_number,
+    );
     hash_chain_config(l1_chain_id, spec_id.to_string())
 }
 
@@ -152,36 +133,4 @@ fn hash_chain_config(chain_id: u64, active_fork_name: String) -> B256 {
     };
 
     keccak256(chain_config.abi_encode_packed())
-}
-
-/// create_kurtosis_chain_spec provides a testing utility for kurtosis devnet.
-/// the latest active fork is prague
-fn create_kurtosis_chain_spec() -> ChainSpec {
-    ChainSpecBuilder::default()
-        .chain(Chain::from_id(3151908))
-        .genesis(Genesis::default())
-        .homestead_activated()
-        .byzantium_activated()
-        .constantinople_activated()
-        .petersburg_activated()
-        .istanbul_activated()
-        .berlin_activated()
-        .london_activated()
-        .shanghai_activated()
-        .cancun_activated()
-        .prague_activated()
-        .build()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use revm_primitives::hardfork::SpecId;
-
-    #[test]
-    fn test_create_kurtosis_chain_spec() {
-        let chain_spec = create_kurtosis_chain_spec();
-        let spec_id = spec_by_timestamp_and_block_number(&chain_spec, 100, 100);
-        assert_eq!(spec_id, SpecId::PRAGUE);
-    }
 }

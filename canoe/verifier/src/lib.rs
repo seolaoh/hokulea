@@ -7,3 +7,5 @@ pub use cert_validity::CertValidity;
 
 pub mod verifier;
 pub use verifier::{CanoeNoOpVerifier, CanoeVerifier, HokuleaCanoeVerificationError};
+
+pub mod chain_spec;
